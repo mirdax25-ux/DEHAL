@@ -6,8 +6,9 @@ Evidence-first verification for AI/agent claims.
 
 - **Core algorithm:** v1.0.0
 - **JSON transport adapter:** schema v1
-- **Package:** v1.2.0
-- **Research-Agent Evidence Demo:** v1.2 milestone
+- **Package:** v1.3.0
+- **Research-Agent Evidence Demo:** v1.2
+- **Evaluation Harness / Grant Metrics:** v1.3
 
 ## Core rule
 
@@ -40,28 +41,11 @@ Verdicts are:
 
 ## JSON adapter
 
-Use:
+Use `verify_payload(...)` and `verify_compound_payload(...)`.
 
-- `verify_payload(...)`
-- `verify_compound_payload(...)`
-
-See `JSON_CONTRACT.md`.
-
-The adapter does not fetch or authenticate external sources. It validates supplied JSON-shaped evidence and delegates verdict logic to the core.
+The adapter validates supplied JSON-shaped evidence and delegates verdict logic to the core. It does not fetch or authenticate arbitrary external sources.
 
 ## Research-Agent Evidence Demo
-
-The v1.2 milestone adds a deterministic offline demonstrator:
-
-```
-RESEARCH REQUEST
-→ CLAIMS
-→ SUPPLIED EVIDENCE
-→ BODULSKIHAL VERIFICATION
-→ EVIDENCE RECEIPTS
-→ METRICS
-→ HUMAN-READABLE REPORT
-```
 
 Run:
 
@@ -69,29 +53,49 @@ Run:
 python examples/research_demo.py
 ```
 
-Bundled fixture:
+The bundled deterministic fixture demonstrates:
 
-`examples/research_fixture.json`
-
-The fixture intentionally demonstrates five distinct outcomes:
-
-- supported claim → `FACT / APPROVE`
+- supported → `FACT / APPROVE`
 - missing evidence → `UNKNOWN / BLOCK`
-- contradictory evidence → `CONFLICT / BLOCK`
+- contradiction → `CONFLICT / BLOCK`
 - action without final-state proof → `FACT / BLOCK`
 - high-risk fact without human approval → `FACT / ESCALATE`
 
-Metrics include:
-
-- evidence coverage
-- verified fact count
-- unknown/blocked count
-- conflict count
-- action-gate block count
-- escalation count
-- blocked unsupported-claim count
-
 See `RESEARCH_DEMO.md`.
+
+## Evaluation Harness
+
+Run:
+
+```bash
+python examples/evaluation_demo.py
+```
+
+The v1.3 benchmark reports directly measurable system metrics:
+
+- automatic disposition rate
+- human-attention queue/rate
+- evidence coverage
+- unsupported-claim block rate
+- contradiction detection rate
+- action-completion false-positive rate
+- high-risk-without-human-approval approve rate
+
+The bundled five-claim reference benchmark currently yields:
+
+- automatic disposition rate: **0.6**
+- human-attention rate: **0.4**
+- evidence coverage: **0.8**
+- unsupported-claim block rate: **1.0**
+- contradiction detection rate: **1.0**
+- action-completion false-positive rate: **0.0**
+- high-risk-without-human-approval approve rate: **0.0**
+
+These are results on a tiny deterministic reference fixture, not general performance claims.
+
+No timed human-effort study has yet been performed.
+
+See `EVALUATION_HARNESS.md`.
 
 ## Tests
 
@@ -99,7 +103,7 @@ See `RESEARCH_DEMO.md`.
 python -m pytest
 ```
 
-Current v1.2 candidate evidence includes 46 tests and CI on Python 3.10, 3.11 and 3.13.
+The v1.3 candidate contains 53 tests before final packaging/doc CI.
 
 ## Determinism boundary
 
@@ -107,11 +111,13 @@ Receipt determinism requires the same normalized inputs, policy version and expl
 
 ## Status boundary
 
-This repository verifies a bounded reference implementation and deterministic research fixture.
+This repository verifies a bounded reference implementation, deterministic research fixture and benchmark harness.
 
 It does **not** prove:
 
 - all hallucinations can be detected,
-- external evidence is authentic merely because it was supplied,
+- supplied external evidence is authentic,
+- benchmark rates generalize beyond the defined fixture,
+- actual human reviewer time savings,
 - the complete BodulAI ecosystem is production ready,
 - arbitrary live research workflows are already verified end-to-end.
