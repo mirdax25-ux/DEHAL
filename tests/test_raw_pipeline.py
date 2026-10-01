@@ -340,3 +340,69 @@ def test_span_proposal_preserves_uncertainty_in_source_text():
     assert atoms[0].source_text == raw
     assert atoms[0].status is AtomStatus.REVIEW_REQUIRED
     assert "epistemic_qualifier" in atoms[0].review_reasons
+
+
+def test_raw_observation_type_is_not_fact_eligible_without_type_approval():
+    raw = "The file exists."
+    envelope = RawResponseEnvelope.create("r3", raw, SpeakerRole.ASSISTANT)
+    atom = atomize_raw_response(envelope)[0]
+
+    contract = build_evidence_contract(atom, ClaimType.OBSERVATION)
+
+    assert contract.fact_eligible is False
+    assert contract.requires_human_review is True
+    assert "observation_type_requires_approval" in contract.review_reasons
+
+
+def test_raw_observation_type_can_be_fact_eligible_after_type_approval():
+    raw = "The file exists."
+    envelope = RawResponseEnvelope.create("r3", raw, SpeakerRole.ASSISTANT)
+    atom = atomize_raw_response(envelope)[0]
+
+    contract = build_evidence_contract(
+        atom,
+        ClaimType.OBSERVATION,
+        type_human_approved=True,
+    )
+
+    assert contract.fact_eligible is True
+    assert contract.requires_human_review is False
+
+
+def test_action_state_type_is_safe_to_accept_without_type_approval_because_it_adds_gate():
+    raw = "Deployment completed."
+    envelope = RawResponseEnvelope.create("r3", raw, SpeakerRole.ASSISTANT)
+    atom = atomize_raw_response(envelope)[0]
+
+    contract = build_evidence_contract(atom, ClaimType.ACTION_STATE)
+
+    assert contract.fact_eligible is True
+    assert contract.requires_post_action is True
+    assert contract.requires_human_review is False
+
+
+@pytest.mark.parametrize("claim_type", [ClaimType.INFERENCE, ClaimType.ESTIMATE])
+def test_non_fact_types_never_need_type_approval_to_remain_non_fact_eligible(claim_type):
+    raw = "The root cause may be a timeout."
+    envelope = RawResponseEnvelope.create("r3", raw, SpeakerRole.ASSISTANT)
+    atom = bind_atom(envelope, atom_id="a1", start=0, end=len(raw))
+
+    contract = build_evidence_contract(atom, claim_type)
+
+    assert contract.fact_eligible is False
+
+
+def test_human_type_approval_cannot_override_review_required_atom():
+    raw = "Tests passed and deployment completed."
+    envelope = RawResponseEnvelope.create("r3", raw, SpeakerRole.ASSISTANT)
+    atom = atomize_raw_response(envelope)[0]
+
+    contract = build_evidence_contract(
+        atom,
+        ClaimType.OBSERVATION,
+        type_human_approved=True,
+    )
+
+    assert contract.fact_eligible is False
+    assert contract.requires_human_review is True
+    assert "compound_clause" in contract.review_reasons
