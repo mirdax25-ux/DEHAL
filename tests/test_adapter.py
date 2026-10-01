@@ -38,7 +38,7 @@ def base_payload():
 
 def test_verify_payload_returns_json_safe_result():
     result = verify_payload(base_payload())
-    assert result["schema_version"] == SCHEMA_VERSION == 1
+    assert result["schema_version"] == SCHEMA_VERSION == 2
     assert result["algorithm_version"] == "1.0.0"
     assert result["classification"] == "FACT"
     assert result["verdict"] == "APPROVE"
@@ -119,7 +119,7 @@ def test_compound_payload_requires_every_consequential_clause():
         "evaluation_time": T0,
     }
     result = verify_compound_payload(payload)
-    assert result["schema_version"] == 1
+    assert result["schema_version"] == 2
     assert result["verdict"] == "BLOCK"
     assert [item["verdict"] for item in result["results"]] == ["APPROVE", "BLOCK"]
 
