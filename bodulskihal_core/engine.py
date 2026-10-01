@@ -78,6 +78,7 @@ class Policy:
     max_age_seconds: int
     reject_future_evidence: bool = True
     require_independent_action_evidence: bool = True
+    medium_risk_min_independent_sources: int = 2
 
 
 @dataclass(frozen=True)
@@ -111,6 +112,8 @@ def _validate_common_inputs(
         raise ValueError("evaluation_time must be timezone-aware")
     if policy.max_age_seconds < 0:
         raise ValueError("max_age_seconds must be non-negative")
+    if policy.medium_risk_min_independent_sources < 1:
+        raise ValueError("medium_risk_min_independent_sources must be at least 1")
     for item in evidence:
         if not _is_aware(item.observed_at):
             raise ValueError("observed_at must be timezone-aware")
@@ -187,6 +190,18 @@ def _has_independent_post_action_evidence(eligible: Sequence[Evidence]) -> bool:
     )
 
 
+def _independent_supporting_source_count(eligible: Sequence[Evidence]) -> int:
+    return len(
+        {
+            item.source_id
+            for item in eligible
+            if item.supports
+            and item.directness is Directness.DIRECT
+            and item.source_role in {SourceRole.VERIFIER, SourceRole.EXTERNAL}
+        }
+    )
+
+
 def _decide_verdict(
     claim: Claim,
     classification: Classification,
@@ -213,6 +228,13 @@ def _decide_verdict(
         ):
             return Verdict.BLOCK, "missing_independent_post_action_evidence"
 
+    if (
+        claim.risk is RiskLevel.MEDIUM
+        and _independent_supporting_source_count(eligible)
+        < policy.medium_risk_min_independent_sources
+    ):
+        return Verdict.ESCALATE, "additional_independent_evidence_required"
+
     if claim.risk is RiskLevel.HIGH and not human_approved:
         return Verdict.ESCALATE, "human_approval_required"
 
@@ -227,10 +249,38 @@ def _make_failure_record(claim: Claim, verdict: Verdict, reason: str) -> dict | 
     if verdict is Verdict.APPROVE:
         return None
     return {
+        "record_type": "expected_gate",
         "claim_id": claim.claim_id,
         "failure_mode": reason,
         "root_cause": "verification_gate_not_satisfied",
         "guardrail": f"preserve_{verdict.value.lower()}_until_new_eligible_evidence_or_required_approval",
+        "regression_test_required": False,
+        "version_change_required": False,
+    }
+
+
+def make_failure_evolution_record(
+    *,
+    failure_mode: str,
+    root_cause: str,
+    guardrail: str,
+    regression_test: str,
+) -> dict:
+    fields = {
+        "failure_mode": failure_mode,
+        "root_cause": root_cause,
+        "guardrail": guardrail,
+        "regression_test": regression_test,
+    }
+    for name, value in fields.items():
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{name} must be non-empty")
+    return {
+        "record_type": "failure_evolution",
+        "failure_mode": failure_mode.strip(),
+        "root_cause": root_cause.strip(),
+        "guardrail": guardrail.strip(),
+        "regression_test": regression_test.strip(),
         "regression_test_required": True,
         "version_change_required": True,
     }
@@ -312,6 +362,12 @@ def _make_receipt(
             "independent_post_action_verified": (
                 _has_independent_post_action_evidence(eligible)
                 if claim.claim_type is ClaimType.ACTION_STATE
+                else None
+            ),
+            "independent_supporting_source_count": _independent_supporting_source_count(eligible),
+            "medium_risk_required_sources": (
+                policy.medium_risk_min_independent_sources
+                if claim.risk is RiskLevel.MEDIUM
                 else None
             ),
             "human_gate": human_gate,
