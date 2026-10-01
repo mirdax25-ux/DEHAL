@@ -42,3 +42,6 @@ jobs:
 
       - name: Research demo smoke
         run: python examples/research_demo.py
+
+      - name: Evaluation harness smoke
+        run: python examples/evaluation_demo.py
