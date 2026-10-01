@@ -138,7 +138,7 @@ def test_demo_human_report_distinguishes_truth_states():
 def test_demo_preserves_versioned_receipts():
     result = run_research_demo(fixture())
 
-    assert result["schema_version"] == 1
+    assert result["schema_version"] == 2
     assert result["algorithm_version"] == "1.0.0"
     assert result["policy_version"] == "1.0"
 
