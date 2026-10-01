@@ -32,7 +32,9 @@ __all__ = [
     "verify_payload",
     "verify_compound_payload",
     "run_research_demo",
+    "evaluate_benchmark",
 ]
 
 from .adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
+from .evaluation import evaluate_benchmark
 from .research_demo import run_research_demo

@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "description": "Deterministic labels for the bundled v1.2 research fixture.",
+  "labels": {
+    "supported": "supported",
+    "missing": "unsupported",
+    "conflict": "contradiction",
+    "action": "action_without_post_state",
+    "high-risk": "high_risk_without_human_approval"
+  }
+}
