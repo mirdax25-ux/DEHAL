@@ -170,3 +170,66 @@ def test_invalid_span_fails_closed():
 
     with pytest.raises(ValueError, match="span"):
         bind_atom(envelope, atom_id="a1", start=2, end=1)
+
+
+def test_epistemic_qualifier_requires_review_and_blocks_fact_eligibility():
+    raw = "The result may be 42."
+    envelope = RawResponseEnvelope.create("r1", raw, SpeakerRole.ASSISTANT)
+
+    atom = atomize_raw_response(envelope)[0]
+    contract = build_evidence_contract(atom, ClaimType.OBSERVATION)
+
+    assert atom.status is AtomStatus.REVIEW_REQUIRED
+    assert "epistemic_qualifier" in atom.review_reasons
+    assert contract.fact_eligible is False
+    assert contract.requires_human_review is True
+
+
+def test_conditional_clause_requires_review():
+    raw = "If the service responds, deployment is ready."
+    envelope = RawResponseEnvelope.create("r1", raw, SpeakerRole.ASSISTANT)
+
+    atom = atomize_raw_response(envelope)[0]
+
+    assert atom.status is AtomStatus.REVIEW_REQUIRED
+    assert "conditional_clause" in atom.review_reasons
+
+
+def test_alternative_clause_requires_review():
+    raw = "The fault is in the network or the database."
+    envelope = RawResponseEnvelope.create("r1", raw, SpeakerRole.ASSISTANT)
+
+    atom = atomize_raw_response(envelope)[0]
+
+    assert atom.status is AtomStatus.REVIEW_REQUIRED
+    assert "compound_clause" in atom.review_reasons
+
+
+def test_semicolon_clause_requires_review():
+    raw = "Tests passed; deployment is still pending."
+    envelope = RawResponseEnvelope.create("r1", raw, SpeakerRole.ASSISTANT)
+
+    atom = atomize_raw_response(envelope)[0]
+
+    assert atom.status is AtomStatus.REVIEW_REQUIRED
+    assert "compound_clause" in atom.review_reasons
+
+
+def test_common_abbreviation_does_not_split_person_name():
+    raw = "Dr. Smith approved the report."
+    envelope = RawResponseEnvelope.create("r1", raw, SpeakerRole.ASSISTANT)
+
+    atoms = atomize_raw_response(envelope)
+
+    assert len(atoms) == 1
+    assert atoms[0].source_text == raw
+
+
+def test_initial_does_not_split_person_name():
+    raw = "A. Smith approved the report."
+    envelope = RawResponseEnvelope.create("r1", raw, SpeakerRole.ASSISTANT)
+
+    atoms = atomize_raw_response(envelope)
+
+    assert len(atoms) == 1
+    assert atoms[0].source_text == raw
