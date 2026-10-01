@@ -18,7 +18,7 @@ First, an agent or upstream workflow produces bounded claims. Each claim is chec
 
 Autonomous steps include structured evidence evaluation, contradiction detection, post-action checking, metrics and receipt generation. Human review is required where policy calls for escalation, especially high-risk actions or conflicting evidence. Human approval never converts missing evidence into fact.
 
-Today the prototype is exposed through a Python core and strict JSON adapter. The next integration step is to embed it inside MCP-compatible research assistants and evidence-synthesis tools so verification occurs inside the workflow rather than as a separate manual step.
+Today the prototype is exposed through a Python core and strict JSON adapter. The first pilot integration target is an MCP-compatible research assistant or evidence-synthesis workflow used by researchers. That external integration is not yet implemented. The goal is for verification to run inside the existing research workflow rather than as a separate manual step.
 
 ## 3. TRUST, AUDIT AND GOVERNANCE
 
@@ -56,7 +56,7 @@ On the bundled five-claim benchmark, the measured results are:
 - action-completion false-positive rate: 0.00
 - high-risk-without-human-approval approve rate: 0.00
 
-These are bounded results on a tiny deterministic fixture, not claims of general accuracy or human time savings.
+These are bounded results on a tiny deterministic fixture, not general accuracy claims. No timed human-effort study has been performed.
 
 ## 6. ALTERNATIVES AND COMPETITORS
 
@@ -76,7 +76,7 @@ A commercial model could combine an open verification core with paid hosted infr
 
 BodulskiHal sits primarily in evidence synthesis, research integrity and institutional decision workflows. The intended users are researchers, publishers, funders and research organizations deploying agentic AI where provenance and accountability matter.
 
-The 2026 Catalyst theme is unusually well matched to the problem we are solving: multi-step AI that acts on research, with audit trails, governance and provenance. We would value Digital Science’s research-software experience, access to real workflow feedback, and guidance on integrating the verifier into systems researchers already use rather than building another isolated AI interface.
+The 2026 Catalyst theme is unusually well matched to the problem we are solving: multi-step AI that acts on research, with audit trails, governance and provenance. Digital Science’s recent Dimensions and Altmetric MCP work also makes the fit concrete: trusted research data can enter an agentic workflow through MCP, while BodulskiHal can test whether downstream claims and actions are sufficiently evidenced to approve, block or escalate. We would value Digital Science’s research-software experience, access to real workflow feedback, and guidance on testing this verification layer inside systems researchers already use rather than building another isolated AI interface.
 
 ## 9. BUDGET
 
