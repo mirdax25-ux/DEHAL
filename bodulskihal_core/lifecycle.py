@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from .engine import Verdict
+from .engine import Verdict, canonical_receipt_sha256
 
 
 class ProjectState(str, Enum):
@@ -38,7 +38,7 @@ def _receipt(
     reason: str,
     reopen_reason: str | None = None,
 ) -> dict:
-    return {
+    receipt = {
         "subsystem": "project_lifecycle",
         "policy_version": policy_version,
         "project_id": project_id,
@@ -51,6 +51,8 @@ def _receipt(
         "reason": reason,
         "reopen_reason": reopen_reason,
     }
+    receipt["receipt_sha256"] = canonical_receipt_sha256(receipt)
+    return receipt
 
 
 def freeze_project(
