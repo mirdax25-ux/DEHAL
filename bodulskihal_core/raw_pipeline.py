@@ -71,9 +71,30 @@ class EvidenceContract:
 
 
 _COMPOUND_CUES = re.compile(
-    r"\b(and|but|while|although|however|whereas|because)\b",
+    r"\b(and|or|nor|but|while|although|however|whereas|because)\b",
     re.IGNORECASE,
 )
+
+_EPISTEMIC_QUALIFIERS = re.compile(
+    r"\b(may|might|could|probably|likely|possibly|perhaps|appears?|seems?)\b",
+    re.IGNORECASE,
+)
+
+_CONDITIONAL_CUES = re.compile(
+    r"\b(if|unless|provided|assuming)\b",
+    re.IGNORECASE,
+)
+
+_ABBREVIATIONS = {
+    "dr.",
+    "mr.",
+    "mrs.",
+    "ms.",
+    "prof.",
+    "sr.",
+    "jr.",
+    "st.",
+}
 
 _AMBIGUOUS_REFERENT = re.compile(
     r"^(it|this|that|they|these|those|he|she)\b",
@@ -85,8 +106,14 @@ def _review_reasons(source_text: str) -> tuple[str, ...]:
     reasons: list[str] = []
     stripped = source_text.strip()
 
-    if _COMPOUND_CUES.search(stripped):
+    if _COMPOUND_CUES.search(stripped) or ";" in stripped:
         reasons.append("compound_clause")
+
+    if _EPISTEMIC_QUALIFIERS.search(stripped):
+        reasons.append("epistemic_qualifier")
+
+    if _CONDITIONAL_CUES.search(stripped):
+        reasons.append("conditional_clause")
 
     if _AMBIGUOUS_REFERENT.search(stripped):
         reasons.append("ambiguous_referent")
@@ -130,6 +157,29 @@ def bind_atom(
     )
 
 
+def _is_abbreviation_period(text: str, index: int) -> bool:
+    if text[index] != "." or index + 1 >= len(text):
+        return False
+
+    word_start = index - 1
+    while word_start >= 0 and text[word_start].isalpha():
+        word_start -= 1
+    token = text[word_start + 1:index + 1].lower()
+
+    is_initial = len(token) == 2 and token[0].isalpha() and token[1] == "."
+    if token not in _ABBREVIATIONS and not is_initial:
+        return False
+
+    cursor = index + 1
+    while cursor < len(text) and text[cursor] in " \t":
+        cursor += 1
+
+    if cursor >= len(text) or "\n" in text[index + 1:cursor + 1]:
+        return False
+
+    return text[cursor].isupper()
+
+
 def _sentence_spans(text: str) -> tuple[tuple[int, int], ...]:
     spans: list[tuple[int, int]] = []
     length = len(text)
@@ -153,6 +203,10 @@ def _sentence_spans(text: str) -> tuple[tuple[int, int], ...]:
                 break
 
             if ch in ".!?":
+                if ch == "." and _is_abbreviation_period(text, i):
+                    i += 1
+                    continue
+
                 next_index = i + 1
                 if next_index >= length or text[next_index].isspace():
                     end = next_index
