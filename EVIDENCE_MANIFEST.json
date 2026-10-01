@@ -1,30 +1,42 @@
 {
-  "artifact": "BodulskiHal Core Algorithm v1.0 reference implementation",
+  "artifact": "BodulskiHal package v1.1.0 release-candidate branch",
+  "package_version": "1.1.0",
   "algorithm_version": "1.0.0",
-  "verification_scope": "local reference implementation only; not the complete BodulAI product or deployment",
-  "test_command": "python -m pytest",
-  "test_result": "29 passed",
+  "json_schema_version": 1,
+  "verification_scope": "local source/package adapter layer; not complete BodulAI deployment",
+  "test_result": "40 passed",
+  "adapter_differential_base_cases": 128,
+  "adapter_differential_comparisons": 256,
   "compileall": "PASS",
-  "install_smoke": "PASS",
-  "exhaustive_invariant_cases": 128,
-  "mutation_post_action": "KILLED",
-  "mutation_human_gate": "KILLED",
-  "independent_code_review_issues": 0,
+  "system_editable_install_smoke": "PASS",
+  "clean_venv_editable_install": "UNKNOWN_ENVIRONMENT: setuptools.build_meta unavailable in runner venv",
+  "demo_after_system_install": "PASS (FACT APPROVE)",
+  "independent_adapter_code_review_issues": 0,
   "source_files": [
     {
-      "path": "CHANGELOG.md",
-      "bytes": 2254,
-      "sha256": "f8e866901ce7279941ee1689be1635a2a1ef2e1b544edb777396b0c9b88b1949"
+      "path": "README.md",
+      "bytes": 2871,
+      "sha256": "18c41751a69553d5fe62c098839b7f87efe8fc79e1c9c1431097fed220f808ec"
     },
     {
-      "path": "README.md",
-      "bytes": 2366,
-      "sha256": "f9db73659f2c5d351014858e1621f423c16b4a6d6006162ebdd96a51210c19f6"
+      "path": "CHANGELOG.md",
+      "bytes": 4051,
+      "sha256": "1353c49333cdd7db71ea5f8b7b3f5b960973199b8488f4f5acf674265ba70030"
+    },
+    {
+      "path": "JSON_CONTRACT.md",
+      "bytes": 1718,
+      "sha256": "7caa15b74406af8105c7a794904ec7ba04cb32321a12479a7990c44839a81f9c"
+    },
+    {
+      "path": "pyproject.toml",
+      "bytes": 316,
+      "sha256": "90bd8432e179b4576f3b8f107f283a39bd2e9131f6152b1de2dc1a1f75663238"
     },
     {
       "path": "bodulskihal_core/__init__.py",
-      "bytes": 509,
-      "sha256": "8a95b8e880671400acec90c89f2249dd13ea56161d9f562adac15fb6a8d0b360"
+      "bytes": 662,
+      "sha256": "3af6a295093c2c55e6b6ffb0d92fd2d92336ea1666f06ba5a8fbb6afbc097d52"
     },
     {
       "path": "bodulskihal_core/engine.py",
@@ -32,14 +44,14 @@
       "sha256": "6bf60b1b51425d3f9b0a600c4c6f071e97a223aa899f44cf2b2543fe0d0913e8"
     },
     {
+      "path": "bodulskihal_core/adapter.py",
+      "bytes": 6748,
+      "sha256": "3e43692caf1c0f0854e85f5348c7b6872aeed1ed293774dfa910629ba613e2e2"
+    },
+    {
       "path": "examples/demo.py",
       "bytes": 671,
       "sha256": "08ea1ad12c9b062e5848259526fcd7784472b38dd5ea17088138d3ed02c96276"
-    },
-    {
-      "path": "pyproject.toml",
-      "bytes": 316,
-      "sha256": "9ebdd25e316dd7d82ab6522ee3fea4b5f7351424b663d4c49b7c586fc794a56d"
     },
     {
       "path": "tests/test_engine.py",
@@ -50,6 +62,16 @@
       "path": "tests/test_invariants.py",
       "bytes": 3684,
       "sha256": "f5ea259694fd1236bd456ec30a0b48449bb415a36e2626565faf59e090299180"
+    },
+    {
+      "path": "tests/test_adapter.py",
+      "bytes": 4306,
+      "sha256": "7f007df50eb62824664e764bcefef9d9f87543bf118e759cb52916ddff684c61"
+    },
+    {
+      "path": "tests/test_adapter_differential.py",
+      "bytes": 3020,
+      "sha256": "5dd221f9428744e2f3beb16facbbf3046ec8f52a727a2858baa7072e2b01a2d9"
     }
   ]
 }
