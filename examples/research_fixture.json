@@ -1,0 +1,79 @@
+{
+  "research_request": "Assess five bounded research-agent claims.",
+  "claims": [
+    {
+      "id": "supported",
+      "text": "The supplied study record exists.",
+      "type": "observation"
+    },
+    {
+      "id": "missing",
+      "text": "The second claim is supported.",
+      "type": "observation"
+    },
+    {
+      "id": "conflict",
+      "text": "The two supplied sources agree.",
+      "type": "observation"
+    },
+    {
+      "id": "action",
+      "text": "The external research export completed.",
+      "type": "action_state"
+    },
+    {
+      "id": "high-risk",
+      "text": "A high-risk publication action is ready.",
+      "type": "observation",
+      "risk": "high"
+    }
+  ],
+  "evidence_by_claim": {
+    "supported": [
+      {
+        "source_id": "study-record",
+        "supports": true,
+        "observed_at": "2026-10-01T04:10:00+00:00",
+        "directness": "direct"
+      }
+    ],
+    "missing": [],
+    "conflict": [
+      {
+        "source_id": "source-a",
+        "supports": true,
+        "observed_at": "2026-10-01T04:10:00+00:00",
+        "directness": "direct"
+      },
+      {
+        "source_id": "source-b",
+        "supports": false,
+        "observed_at": "2026-10-01T04:10:00+00:00",
+        "directness": "direct"
+      }
+    ],
+    "action": [
+      {
+        "source_id": "export-request",
+        "supports": true,
+        "observed_at": "2026-10-01T04:10:00+00:00",
+        "directness": "direct",
+        "post_action": false
+      }
+    ],
+    "high-risk": [
+      {
+        "source_id": "policy-check",
+        "supports": true,
+        "observed_at": "2026-10-01T04:10:00+00:00",
+        "directness": "direct"
+      }
+    ]
+  },
+  "human_approvals": {},
+  "policy": {
+    "version": "1.0",
+    "max_age_seconds": 300
+  },
+  "evaluation_time": "2026-10-01T04:10:00+00:00"
+}
