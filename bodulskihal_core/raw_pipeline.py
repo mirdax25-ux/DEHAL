@@ -73,6 +73,7 @@ class EvidenceContract:
     requires_post_action: bool
     requires_human_review: bool
     fact_eligible: bool
+    review_reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,18 @@ _EPISTEMIC_QUALIFIERS = re.compile(
 
 _CONDITIONAL_CUES = re.compile(
     r"\b(if|unless|provided|assuming)\b",
+    re.IGNORECASE,
+)
+
+_ACTION_STATE_CUES = re.compile(
+    r"\b(completed|complete|finished|sent|submitted|deployed|merged|published|"
+    r"uploaded|downloaded|installed|deleted|created|updated|saved|executed|"
+    r"started|stopped|closed|opened|approved|rejected)\b",
+    re.IGNORECASE,
+)
+
+_ESTIMATE_CUES = re.compile(
+    r"\b(estimate|estimated|approximately|approximate|roughly)\b",
     re.IGNORECASE,
 )
 
@@ -405,21 +418,47 @@ def type_clause(atom: ClaimAtom) -> ClauseTypeDecision:
 def build_evidence_contract(
     atom: ClaimAtom,
     claim_type: ClaimType,
+    *,
+    type_human_approved: bool = False,
 ) -> EvidenceContract:
     if not isinstance(claim_type, ClaimType):
         raise TypeError("claim_type must be ClaimType")
+    if type(type_human_approved) is not bool:
+        raise TypeError("type_human_approved must be bool")
 
-    requires_human_review = atom.status is AtomStatus.REVIEW_REQUIRED
-    fact_eligible = (
-        not requires_human_review
-        and claim_type not in {ClaimType.INFERENCE, ClaimType.ESTIMATE}
-    )
+    review_reasons = list(atom.review_reasons)
+    atom_requires_review = atom.status is AtomStatus.REVIEW_REQUIRED
+    requires_human_review = atom_requires_review
+    requires_post_action = claim_type is ClaimType.ACTION_STATE
+
+    if claim_type in {ClaimType.INFERENCE, ClaimType.ESTIMATE}:
+        fact_eligible = False
+    elif claim_type is ClaimType.ACTION_STATE:
+        fact_eligible = not atom_requires_review
+    elif claim_type is ClaimType.RISK_SENSITIVE:
+        fact_eligible = False
+        requires_human_review = True
+        if "risk_sensitive_requires_human_review" not in review_reasons:
+            review_reasons.append("risk_sensitive_requires_human_review")
+    else:
+        if atom_requires_review:
+            fact_eligible = False
+            requires_human_review = True
+        elif type_human_approved:
+            fact_eligible = True
+            requires_human_review = False
+        else:
+            fact_eligible = False
+            requires_human_review = True
+            if "observation_type_requires_approval" not in review_reasons:
+                review_reasons.append("observation_type_requires_approval")
 
     return EvidenceContract(
         atom_id=atom.atom_id,
         claim_type=claim_type,
         required_directness=Directness.DIRECT,
-        requires_post_action=claim_type is ClaimType.ACTION_STATE,
+        requires_post_action=requires_post_action,
         requires_human_review=requires_human_review,
         fact_eligible=fact_eligible,
+        review_reasons=tuple(review_reasons),
     )
