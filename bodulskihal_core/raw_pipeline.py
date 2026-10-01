@@ -281,6 +281,17 @@ def validate_atom_proposals(
         if not isinstance(proposal.quoted_text, str):
             raise TypeError("quoted_text must be string")
 
+        if (
+            proposal.start < 0
+            or proposal.end > len(envelope.text)
+            or proposal.start >= proposal.end
+        ):
+            raise ValueError("invalid source span")
+
+        exact_slice = envelope.text[proposal.start:proposal.end]
+        if proposal.quoted_text != exact_slice:
+            raise ValueError("quoted_text must exactly match source span")
+
         atom = bind_atom(
             envelope,
             atom_id=proposal.atom_id,
