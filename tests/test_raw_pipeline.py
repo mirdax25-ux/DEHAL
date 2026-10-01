@@ -233,3 +233,110 @@ def test_initial_does_not_split_person_name():
 
     assert len(atoms) == 1
     assert atoms[0].source_text == raw
+
+
+def test_span_proposal_can_only_point_to_exact_raw_text():
+    from bodulskihal_core.raw_pipeline import SpanProposal, validate_atom_proposals
+
+    raw = "The file exists. Deployment may still be pending."
+    envelope = RawResponseEnvelope.create("r2", raw, SpeakerRole.ASSISTANT)
+    start = raw.index("The file exists.")
+    end = start + len("The file exists.")
+
+    atoms = validate_atom_proposals(
+        envelope,
+        [SpanProposal(atom_id="p1", start=start, end=end, quoted_text="The file exists.")],
+    )
+
+    assert len(atoms) == 1
+    assert atoms[0].source_text == "The file exists."
+    assert atoms[0].start == start
+    assert atoms[0].end == end
+
+
+def test_span_proposal_rejects_paraphrased_quote():
+    from bodulskihal_core.raw_pipeline import SpanProposal, validate_atom_proposals
+
+    raw = "The result may be 42."
+    envelope = RawResponseEnvelope.create("r2", raw, SpeakerRole.ASSISTANT)
+
+    with pytest.raises(ValueError, match="quoted_text"):
+        validate_atom_proposals(
+            envelope,
+            [SpanProposal(atom_id="p1", start=0, end=len(raw), quoted_text="The result is 42.")],
+        )
+
+
+def test_span_proposals_must_not_overlap():
+    from bodulskihal_core.raw_pipeline import SpanProposal, validate_atom_proposals
+
+    raw = "Alpha beta gamma."
+    envelope = RawResponseEnvelope.create("r2", raw, SpeakerRole.ASSISTANT)
+
+    with pytest.raises(ValueError, match="overlap"):
+        validate_atom_proposals(
+            envelope,
+            [
+                SpanProposal(atom_id="p1", start=0, end=10, quoted_text=raw[0:10]),
+                SpanProposal(atom_id="p2", start=6, end=len(raw), quoted_text=raw[6:]),
+            ],
+        )
+
+
+def test_span_proposals_are_sorted_deterministically_by_source_offset():
+    from bodulskihal_core.raw_pipeline import SpanProposal, validate_atom_proposals
+
+    raw = "First. Second."
+    envelope = RawResponseEnvelope.create("r2", raw, SpeakerRole.ASSISTANT)
+    first = SpanProposal(atom_id="p1", start=0, end=6, quoted_text="First.")
+    second = SpanProposal(atom_id="p2", start=7, end=14, quoted_text="Second.")
+
+    atoms = validate_atom_proposals(envelope, [second, first])
+
+    assert [a.atom_id for a in atoms] == ["p1", "p2"]
+    assert [a.source_text for a in atoms] == ["First.", "Second."]
+
+
+def test_duplicate_atom_ids_are_rejected():
+    from bodulskihal_core.raw_pipeline import SpanProposal, validate_atom_proposals
+
+    raw = "First. Second."
+    envelope = RawResponseEnvelope.create("r2", raw, SpeakerRole.ASSISTANT)
+
+    with pytest.raises(ValueError, match="duplicate atom_id"):
+        validate_atom_proposals(
+            envelope,
+            [
+                SpanProposal(atom_id="same", start=0, end=6, quoted_text="First."),
+                SpanProposal(atom_id="same", start=7, end=14, quoted_text="Second."),
+            ],
+        )
+
+
+def test_non_assistant_span_proposals_are_rejected():
+    from bodulskihal_core.raw_pipeline import SpanProposal, validate_atom_proposals
+
+    raw = "The system is broken."
+    envelope = RawResponseEnvelope.create("r2", raw, SpeakerRole.USER)
+
+    with pytest.raises(ValueError, match="assistant"):
+        validate_atom_proposals(
+            envelope,
+            [SpanProposal(atom_id="p1", start=0, end=len(raw), quoted_text=raw)],
+        )
+
+
+def test_span_proposal_preserves_uncertainty_in_source_text():
+    from bodulskihal_core.raw_pipeline import SpanProposal, validate_atom_proposals
+
+    raw = "The result might be 42."
+    envelope = RawResponseEnvelope.create("r2", raw, SpeakerRole.ASSISTANT)
+
+    atoms = validate_atom_proposals(
+        envelope,
+        [SpanProposal(atom_id="p1", start=0, end=len(raw), quoted_text=raw)],
+    )
+
+    assert atoms[0].source_text == raw
+    assert atoms[0].status is AtomStatus.REVIEW_REQUIRED
+    assert "epistemic_qualifier" in atoms[0].review_reasons
