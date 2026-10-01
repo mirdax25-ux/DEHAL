@@ -70,6 +70,14 @@ class EvidenceContract:
     fact_eligible: bool
 
 
+@dataclass(frozen=True)
+class SpanProposal:
+    atom_id: str
+    start: int
+    end: int
+    quoted_text: str
+
+
 _COMPOUND_CUES = re.compile(
     r"\b(and|or|nor|but|while|although|however|whereas|because)\b",
     re.IGNORECASE,
@@ -243,6 +251,51 @@ def atomize_raw_response(
         )
         for index, (start, end) in enumerate(spans, start=1)
     )
+
+
+def validate_atom_proposals(
+    envelope: RawResponseEnvelope,
+    proposals: list[SpanProposal] | tuple[SpanProposal, ...],
+) -> tuple[ClaimAtom, ...]:
+    if envelope.speaker_role is not SpeakerRole.ASSISTANT:
+        raise ValueError(
+            "only assistant responses may be atomized as assistant claims"
+        )
+
+    proposal_seq = tuple(proposals)
+    atom_ids = [proposal.atom_id for proposal in proposal_seq]
+    if len(atom_ids) != len(set(atom_ids)):
+        raise ValueError("duplicate atom_id")
+
+    ordered = sorted(
+        proposal_seq,
+        key=lambda proposal: (proposal.start, proposal.end, proposal.atom_id),
+    )
+
+    previous_end: int | None = None
+    atoms: list[ClaimAtom] = []
+
+    for proposal in ordered:
+        if not isinstance(proposal.atom_id, str) or not proposal.atom_id.strip():
+            raise ValueError("atom_id must be non-empty")
+        if not isinstance(proposal.quoted_text, str):
+            raise TypeError("quoted_text must be string")
+
+        atom = bind_atom(
+            envelope,
+            atom_id=proposal.atom_id,
+            start=proposal.start,
+            end=proposal.end,
+            proposed_text=proposal.quoted_text,
+        )
+
+        if previous_end is not None and atom.start < previous_end:
+            raise ValueError("span proposals must not overlap")
+
+        atoms.append(atom)
+        previous_end = atom.end
+
+    return tuple(atoms)
 
 
 def build_evidence_contract(
