@@ -1,42 +1,46 @@
 {
-  "artifact": "BodulskiHal Research-Agent Evidence Demo v1.2 candidate",
-  "package_version": "1.2.0",
+  "artifact": "BodulskiHal Evaluation Harness v1.3 candidate",
+  "package_version": "1.3.0",
   "algorithm_version": "1.0.0",
   "json_schema_version": 1,
-  "verification_scope": "deterministic supplied-evidence research demo; not arbitrary live research or complete BodulAI deployment",
-  "tests": {
-    "count": 46,
-    "result": "PASS",
-    "red_module_missing_observed": true,
-    "red_fixture_missing_observed": true
+  "benchmark_version": "1.0",
+  "verification_scope": "deterministic supplied-evidence research benchmark; not arbitrary live research or human time-savings study",
+  "tests_before_final_packaging": {
+    "count": 53,
+    "result": "PASS"
   },
-  "ci_evidence_before_manifest_snapshot": {
-    "run_id": 36813448513,
+  "tdd_evidence": {
+    "missing_evaluation_module_red_observed": true,
+    "grant_wording_regression_observed": true,
+    "grant_wording_regression_fixed": true
+  },
+  "ci_green_before_final_packaging": {
+    "run_id": 36823378550,
     "python_versions": ["3.10", "3.11", "3.13"],
-    "all_jobs_conclusion": "success",
-    "required_steps": [
-      "package install",
-      "compile",
-      "46 tests",
-      "demo smoke",
-      "research demo smoke"
-    ]
+    "all_jobs_conclusion": "success"
   },
-  "research_fixture": {
+  "reference_metrics": {
     "total_claims": 5,
-    "verified_fact_count": 1,
-    "unknown_blocked_count": 1,
-    "conflict_blocked_count": 1,
-    "action_gate_blocked_count": 1,
+    "auto_approved_count": 1,
+    "auto_blocked_count": 3,
     "escalated_count": 1,
-    "blocked_unsupported_claim_count": 1,
+    "human_attention_queue_count": 2,
+    "human_attention_rate": 0.4,
+    "automatic_disposition_count": 3,
+    "automatic_disposition_rate": 0.6,
     "evidence_coverage": 0.8,
-    "overall_verdict": "ESCALATE"
+    "unsupported_claim_block_rate": 1.0,
+    "contradiction_detection_rate": 1.0,
+    "action_completion_false_positive_rate": 0.0,
+    "high_risk_without_human_approval_approve_rate": 0.0
   },
-  "independent_research_demo_review_issues": 0,
+  "independent_evaluation_review_issues": 0,
   "boundaries": [
+    "benchmark contains only five deterministic claims",
     "supplied evidence is not automatically authenticated",
     "evidence coverage is not a truth score",
+    "automatic disposition is not a measured human time saving",
+    "no timed human-effort study has been performed",
     "no claim of general hallucination elimination",
     "no claim of production deployment",
     "no claim that complete BodulAI is verified ready"
