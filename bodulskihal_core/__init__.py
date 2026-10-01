@@ -14,6 +14,7 @@ from .engine import (
     verify_claim,
     verify_compound,
     canonical_receipt_sha256,
+    make_failure_evolution_record,
 )
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "verify_claim",
     "verify_compound",
     "canonical_receipt_sha256",
+    "make_failure_evolution_record",
     "SCHEMA_VERSION",
     "verify_payload",
     "verify_compound_payload",
