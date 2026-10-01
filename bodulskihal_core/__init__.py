@@ -28,4 +28,9 @@ __all__ = [
     "Verdict",
     "verify_claim",
     "verify_compound",
+    "SCHEMA_VERSION",
+    "verify_payload",
+    "verify_compound_payload",
 ]
+
+from .adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
