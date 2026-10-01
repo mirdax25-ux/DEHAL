@@ -39,7 +39,7 @@ def base_payload():
 def test_verify_payload_returns_json_safe_result():
     result = verify_payload(base_payload())
     assert result["schema_version"] == SCHEMA_VERSION == 2
-    assert result["algorithm_version"] == "1.0.0"
+    assert result["algorithm_version"] == "2.0.0"
     assert result["classification"] == "FACT"
     assert result["verdict"] == "APPROVE"
     assert result["receipt"]["claim"]["id"] == "c1"
