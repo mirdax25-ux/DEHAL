@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Iterable, Mapping, Sequence
 
-ALGORITHM_VERSION = "1.0.0"
+ALGORITHM_VERSION = "2.0.0"
 
 
 class ClaimType(str, Enum):
