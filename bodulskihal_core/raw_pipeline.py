@@ -20,6 +20,11 @@ class AtomStatus(str, Enum):
     REVIEW_REQUIRED = "review_required"
 
 
+class ClauseTypeStatus(str, Enum):
+    TYPED = "typed"
+    REVIEW_REQUIRED = "review_required"
+
+
 @dataclass(frozen=True)
 class RawResponseEnvelope:
     response_id: str
@@ -68,6 +73,15 @@ class EvidenceContract:
     requires_post_action: bool
     requires_human_review: bool
     fact_eligible: bool
+
+
+@dataclass(frozen=True)
+class ClauseTypeDecision:
+    atom_id: str
+    claim_type: ClaimType | None
+    status: ClauseTypeStatus
+    reasons: tuple[str, ...]
+    rule: str
 
 
 @dataclass(frozen=True)
@@ -307,6 +321,85 @@ def validate_atom_proposals(
         previous_end = atom.end
 
     return tuple(atoms)
+
+
+def type_clause(atom: ClaimAtom) -> ClauseTypeDecision:
+    reasons = list(atom.review_reasons)
+    blocking_reasons = {
+        "compound_clause",
+        "conditional_clause",
+        "ambiguous_referent",
+    }
+
+    if blocking_reasons.intersection(reasons):
+        return ClauseTypeDecision(
+            atom_id=atom.atom_id,
+            claim_type=None,
+            status=ClauseTypeStatus.REVIEW_REQUIRED,
+            reasons=tuple(reasons),
+            rule="review_gate",
+        )
+
+    text = atom.source_text.strip()
+    action_signal = bool(_ACTION_STATE_CUES.search(text))
+    estimate_signal = bool(_ESTIMATE_CUES.search(text))
+    inference_signal = "epistemic_qualifier" in reasons
+
+    signals = [
+        claim_type
+        for claim_type, present in (
+            (ClaimType.ACTION_STATE, action_signal),
+            (ClaimType.ESTIMATE, estimate_signal),
+            (ClaimType.INFERENCE, inference_signal),
+        )
+        if present
+    ]
+
+    if len(signals) > 1:
+        if "multiple_type_signals" not in reasons:
+            reasons.append("multiple_type_signals")
+        return ClauseTypeDecision(
+            atom_id=atom.atom_id,
+            claim_type=None,
+            status=ClauseTypeStatus.REVIEW_REQUIRED,
+            reasons=tuple(reasons),
+            rule="conflicting_type_cues",
+        )
+
+    if inference_signal:
+        return ClauseTypeDecision(
+            atom_id=atom.atom_id,
+            claim_type=ClaimType.INFERENCE,
+            status=ClauseTypeStatus.REVIEW_REQUIRED,
+            reasons=tuple(reasons),
+            rule="epistemic_qualifier",
+        )
+
+    if estimate_signal:
+        return ClauseTypeDecision(
+            atom_id=atom.atom_id,
+            claim_type=ClaimType.ESTIMATE,
+            status=ClauseTypeStatus.TYPED,
+            reasons=tuple(reasons),
+            rule="estimate_cue",
+        )
+
+    if action_signal:
+        return ClauseTypeDecision(
+            atom_id=atom.atom_id,
+            claim_type=ClaimType.ACTION_STATE,
+            status=ClauseTypeStatus.TYPED,
+            reasons=tuple(reasons),
+            rule="action_state_cue",
+        )
+
+    return ClauseTypeDecision(
+        atom_id=atom.atom_id,
+        claim_type=ClaimType.OBSERVATION,
+        status=ClauseTypeStatus.TYPED,
+        reasons=tuple(reasons),
+        rule="default_observation",
+    )
 
 
 def build_evidence_contract(
