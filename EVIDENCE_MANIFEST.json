@@ -3,14 +3,29 @@
   "package_version": "1.1.0",
   "algorithm_version": "1.0.0",
   "json_schema_version": 1,
-  "verification_scope": "local source/package adapter layer; not complete BodulAI deployment",
-  "test_result": "40 passed",
+  "verification_scope": "package/core adapter scope only; not complete BodulAI deployment",
+  "local_test_result": "40 passed",
   "adapter_differential_base_cases": 128,
   "adapter_differential_comparisons": 256,
-  "compileall": "PASS",
+  "local_compileall": "PASS",
   "system_editable_install_smoke": "PASS",
-  "clean_venv_editable_install": "UNKNOWN_ENVIRONMENT: setuptools.build_meta unavailable in runner venv",
-  "demo_after_system_install": "PASS (FACT APPROVE)",
+  "local_clean_venv_editable_install": "UNKNOWN_ENVIRONMENT: setuptools.build_meta unavailable in runner venv",
+  "github_pr_ci": {
+    "run_id": 36812528208,
+    "result": "PASS",
+    "python_versions": [
+      "3.10",
+      "3.11",
+      "3.13"
+    ],
+    "per_job_required_steps": [
+      "install package and test runner",
+      "compile",
+      "40 tests",
+      "demo smoke"
+    ],
+    "all_jobs_conclusion": "success"
+  },
   "independent_adapter_code_review_issues": 0,
   "source_files": [
     {
@@ -20,8 +35,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 4051,
-      "sha256": "1353c49333cdd7db71ea5f8b7b3f5b960973199b8488f4f5acf674265ba70030"
+      "bytes": 4207,
+      "sha256": "3c5615dfbfd3220e30532de2b8513df8227efa3835b0b1276d9cb5da81a2e1af"
     },
     {
       "path": "JSON_CONTRACT.md",
