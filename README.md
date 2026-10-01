@@ -1,12 +1,19 @@
-# BodulskiHal Core Algorithm v1.0
+# BodulskiHal
 
-Deterministic, evidence-first reference engine for AI/agent claim verification.
+Evidence-first verification for AI/agent claims.
+
+## Versions
+
+- **Core algorithm:** v1.0.0
+- **JSON transport adapter:** schema v1
+- **Package:** v1.2.0
+- **Research-Agent Evidence Demo:** v1.2 milestone
 
 ## Core rule
 
 `CONFIDENCE <= EVIDENCE`
 
-The engine classifies each atomic claim as one of:
+Atomic claims are classified as:
 
 - `FACT`
 - `INFERENCE`
@@ -14,7 +21,7 @@ The engine classifies each atomic claim as one of:
 - `UNKNOWN`
 - `CONFLICT`
 
-and returns one of:
+Verdicts are:
 
 - `APPROVE`
 - `BLOCK`
@@ -25,71 +32,86 @@ and returns one of:
 1. Missing eligible evidence cannot become `FACT`.
 2. Eligible contradiction yields `CONFLICT`.
 3. `INFERENCE` and `ESTIMATE` do not masquerade as `FACT`.
-4. Action-completion claims require fresh, direct, post-action/final-state evidence.
+4. Action completion requires fresh, direct post-action/final-state evidence.
 5. High-risk claims require human approval before `APPROVE`.
 6. Compound verification requires every consequential clause to pass.
-7. Duplicate evidence identities and duplicate compound claim IDs are rejected.
-8. Naive timestamps, negative freshness windows, and empty compounds fail closed.
+7. Duplicate evidence/claim identities are rejected.
+8. Naive timestamps, invalid freshness windows and empty compounds fail closed.
 
-## Determinism boundary
+## JSON adapter
 
-Receipt determinism is defined over the same normalized claim/evidence inputs, the same policy version **and the same `evaluation_time`**. Freshness is time-dependent, so `evaluation_time` is an explicit algorithm input.
+Use:
 
-## Example
+- `verify_payload(...)`
+- `verify_compound_payload(...)`
 
-```python
-from datetime import datetime, timezone
-from bodulskihal_core import (
-    Claim, ClaimType, Directness, Evidence, Policy, verify_claim
-)
+See `JSON_CONTRACT.md`.
 
-now = datetime.now(timezone.utc)
-result = verify_claim(
-    Claim("send-1", "Email sent", ClaimType.ACTION_STATE),
-    [
-        Evidence(
-            source_id="provider-final-state",
-            supports=True,
-            observed_at=now,
-            directness=Directness.DIRECT,
-            post_action=True,
-        )
-    ],
-    policy=Policy(version="1.0", max_age_seconds=300),
-    evaluation_time=now,
-)
+The adapter does not fetch or authenticate external sources. It validates supplied JSON-shaped evidence and delegates verdict logic to the core.
 
-print(result.classification.value)  # FACT
-print(result.verdict.value)         # APPROVE
-print(result.receipt)
+## Research-Agent Evidence Demo
+
+The v1.2 milestone adds a deterministic offline demonstrator:
+
+```
+RESEARCH REQUEST
+→ CLAIMS
+→ SUPPLIED EVIDENCE
+→ BODULSKIHAL VERIFICATION
+→ EVIDENCE RECEIPTS
+→ METRICS
+→ HUMAN-READABLE REPORT
 ```
 
-## JSON adapter (package v1.1.0)
+Run:
 
-The v1.1 package adds a strict transport adapter without changing the v1.0 core algorithm. Use `verify_payload(...)` or `verify_compound_payload(...)` for JSON-shaped input. See `JSON_CONTRACT.md`.
+```bash
+python examples/research_demo.py
+```
 
-The adapter is deliberately offline: it parses and validates supplied data, then delegates to the deterministic core. It does not fetch or authenticate external sources.
+Bundled fixture:
+
+`examples/research_fixture.json`
+
+The fixture intentionally demonstrates five distinct outcomes:
+
+- supported claim → `FACT / APPROVE`
+- missing evidence → `UNKNOWN / BLOCK`
+- contradictory evidence → `CONFLICT / BLOCK`
+- action without final-state proof → `FACT / BLOCK`
+- high-risk fact without human approval → `FACT / ESCALATE`
+
+Metrics include:
+
+- evidence coverage
+- verified fact count
+- unknown/blocked count
+- conflict count
+- action-gate block count
+- escalation count
+- blocked unsupported-claim count
+
+See `RESEARCH_DEMO.md`.
 
 ## Tests
-
-Run:
 
 ```bash
 python -m pytest
 ```
 
-Current source checkpoint includes:
+Current v1.2 candidate evidence includes 46 tests and CI on Python 3.10, 3.11 and 3.13.
 
-- strict JSON adapter tests
-- 128-case adapter/core differential check (256 human-gate comparisons)
+## Determinism boundary
 
-- unit/negative tests
-- deterministic receipt tests
-- compound-gate tests
-- timestamp/freshness boundary tests
-- exhaustive 128-case boolean invariant test
-- mutation checks for post-action and human-approval gates
+Receipt determinism requires the same normalized inputs, policy version and explicit `evaluation_time`. Freshness is time-dependent.
 
 ## Status boundary
 
-This package is a **reference implementation** of the v1.0 core verification algorithm. It is not, by itself, a claim that the complete BodulAI product, external integrations, deployment, or production environment are verified ready.
+This repository verifies a bounded reference implementation and deterministic research fixture.
+
+It does **not** prove:
+
+- all hallucinations can be detected,
+- external evidence is authentic merely because it was supplied,
+- the complete BodulAI ecosystem is production ready,
+- arbitrary live research workflows are already verified end-to-end.

@@ -31,6 +31,8 @@ __all__ = [
     "SCHEMA_VERSION",
     "verify_payload",
     "verify_compound_payload",
+    "run_research_demo",
 ]
 
 from .adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
+from .research_demo import run_research_demo
