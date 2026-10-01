@@ -4,9 +4,21 @@ import hashlib
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from typing import Any, Mapping
 
-from .engine import ClaimType, Directness
+from .engine import (
+    Claim,
+    ClaimType,
+    Directness,
+    Evidence,
+    Policy,
+    RiskLevel,
+    VerificationResult,
+    Verdict,
+    verify_compound,
+)
 
 
 class TypeAuthority(str, Enum):
@@ -49,6 +61,13 @@ class IngestionResult:
     normalized: NormalizedResponse
     atoms: tuple[ClaimAtom, ...]
     contracts: tuple[EvidenceContract, ...]
+
+
+@dataclass(frozen=True)
+class IngestedVerificationResult:
+    ingestion: IngestionResult
+    results: tuple[VerificationResult, ...]
+    verdict: Verdict
 
 
 _TYPE_LABEL = re.compile(r"^\[(?P<label>[A-Za-z_]+)\](?:\s+|$)")
@@ -268,4 +287,189 @@ def ingest_model_response(
         normalized=normalized,
         atoms=atoms,
         contracts=contracts,
+    )
+
+
+
+_ALLOWED_EVIDENCE_KEYS = {
+    "source_id",
+    "supports",
+    "observed_at",
+    "directness",
+    "post_action",
+    "eligible",
+}
+
+
+def _record_mapping(value: Any, path: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TypeError(f"{path} must be object")
+    return value
+
+
+def _record_string(value: Any, path: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise TypeError(f"{path} must be non-empty string")
+    return value.strip()
+
+
+def _record_bool(value: Any, path: str) -> bool:
+    if type(value) is not bool:
+        raise TypeError(f"{path} must be bool")
+    return value
+
+
+def _record_datetime(value: Any, path: str) -> datetime:
+    raw = _record_string(value, path)
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError as exc:
+        raise ValueError(f"{path} must be ISO 8601 datetime") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{path} must be timezone-aware")
+    return parsed
+
+
+def _record_directness(value: Any, path: str) -> Directness:
+    raw = _record_string(value, path)
+    try:
+        return Directness(raw)
+    except ValueError as exc:
+        raise ValueError(f"invalid {path}: {raw}") from exc
+
+
+def collect_normalize_evidence(
+    records_by_atom: Mapping[str, list[Mapping[str, Any]]],
+    *,
+    known_atom_ids: set[str],
+) -> dict[str, tuple[Evidence, ...]]:
+    if not isinstance(records_by_atom, Mapping):
+        raise TypeError("records_by_atom must be object")
+    if not isinstance(known_atom_ids, set):
+        raise TypeError("known_atom_ids must be set")
+
+    unknown = sorted(set(records_by_atom) - known_atom_ids)
+    if unknown:
+        raise ValueError("unknown atom_id: " + ", ".join(unknown))
+
+    normalized: dict[str, tuple[Evidence, ...]] = {}
+    for atom_id in sorted(known_atom_ids):
+        raw_items = records_by_atom.get(atom_id, [])
+        if not isinstance(raw_items, list):
+            raise TypeError(f"evidence for {atom_id} must be list")
+
+        items: list[Evidence] = []
+        seen_sources: set[str] = set()
+
+        for index, raw in enumerate(raw_items):
+            path = f"evidence_by_atom.{atom_id}[{index}]"
+            obj = _record_mapping(raw, path)
+
+            extra = sorted(set(obj) - _ALLOWED_EVIDENCE_KEYS)
+            if extra:
+                raise ValueError(
+                    f"{path} contains unsupported fields: " + ", ".join(extra)
+                )
+
+            source_id = _record_string(obj.get("source_id"), f"{path}.source_id")
+            if source_id in seen_sources:
+                raise ValueError(
+                    f"duplicate source_id for {atom_id}: {source_id}"
+                )
+            seen_sources.add(source_id)
+
+            if "supports" not in obj:
+                raise ValueError(f"missing required field: {path}.supports")
+            if "observed_at" not in obj:
+                raise ValueError(f"missing required field: {path}.observed_at")
+            if "directness" not in obj:
+                raise ValueError(f"missing required field: {path}.directness")
+
+            items.append(
+                Evidence(
+                    source_id=source_id,
+                    supports=_record_bool(obj["supports"], f"{path}.supports"),
+                    observed_at=_record_datetime(
+                        obj["observed_at"],
+                        f"{path}.observed_at",
+                    ),
+                    directness=_record_directness(
+                        obj["directness"],
+                        f"{path}.directness",
+                    ),
+                    post_action=_record_bool(
+                        obj.get("post_action", False),
+                        f"{path}.post_action",
+                    ),
+                    eligible=_record_bool(
+                        obj.get("eligible", True),
+                        f"{path}.eligible",
+                    ),
+                )
+            )
+
+        normalized[atom_id] = tuple(
+            sorted(items, key=lambda item: item.source_id)
+        )
+
+    return normalized
+
+
+def _claim_from_atom(atom: ClaimAtom) -> Claim:
+    risk = (
+        RiskLevel.HIGH
+        if atom.claim_type is ClaimType.RISK_SENSITIVE
+        else RiskLevel.LOW
+    )
+    return Claim(
+        claim_id=atom.atom_id,
+        text=atom.text,
+        claim_type=atom.claim_type,
+        risk=risk,
+        consequential=True,
+    )
+
+
+def verify_model_response(
+    raw: str,
+    *,
+    evidence_by_atom: Mapping[str, list[Mapping[str, Any]]],
+    authority: TypeAuthority,
+    policy: Policy,
+    evaluation_time: datetime,
+    human_approvals: Mapping[str, bool] | None = None,
+) -> IngestedVerificationResult:
+    ingestion = ingest_model_response(raw, authority=authority)
+    atom_ids = {atom.atom_id for atom in ingestion.atoms}
+
+    evidence = collect_normalize_evidence(
+        evidence_by_atom,
+        known_atom_ids=atom_ids,
+    )
+
+    approvals = human_approvals or {}
+    unknown_approvals = sorted(set(approvals) - atom_ids)
+    if unknown_approvals:
+        raise ValueError(
+            "human_approvals contains unknown atom_id: "
+            + ", ".join(unknown_approvals)
+        )
+    for atom_id, value in approvals.items():
+        if type(value) is not bool:
+            raise TypeError(f"human_approvals.{atom_id} must be bool")
+
+    compound = verify_compound(
+        tuple(_claim_from_atom(atom) for atom in ingestion.atoms),
+        evidence,
+        policy=policy,
+        evaluation_time=evaluation_time,
+        human_approvals=approvals,
+    )
+
+    return IngestedVerificationResult(
+        ingestion=ingestion,
+        results=compound.results,
+        verdict=compound.verdict,
     )
