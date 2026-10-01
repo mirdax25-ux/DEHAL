@@ -15,6 +15,7 @@ from .engine import (
     Evidence,
     Policy,
     RiskLevel,
+    SourceRole,
     VerificationResult,
     Verdict,
     verify_compound,
@@ -298,6 +299,10 @@ _ALLOWED_EVIDENCE_KEYS = {
     "directness",
     "post_action",
     "eligible",
+    "evidence_id",
+    "source_role",
+    "source_ref",
+    "content_sha256",
 }
 
 
@@ -311,6 +316,12 @@ def _record_string(value: Any, path: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise TypeError(f"{path} must be non-empty string")
     return value.strip()
+
+
+def _record_optional_string(value: Any, path: str) -> str | None:
+    if value is None:
+        return None
+    return _record_string(value, path)
 
 
 def _record_bool(value: Any, path: str) -> bool:
@@ -340,6 +351,14 @@ def _record_directness(value: Any, path: str) -> Directness:
         raise ValueError(f"invalid {path}: {raw}") from exc
 
 
+def _record_source_role(value: Any, path: str) -> SourceRole:
+    raw = _record_string(value, path)
+    try:
+        return SourceRole(raw)
+    except ValueError as exc:
+        raise ValueError(f"invalid {path}: {raw}") from exc
+
+
 def collect_normalize_evidence(
     records_by_atom: Mapping[str, list[Mapping[str, Any]]],
     *,
@@ -361,7 +380,7 @@ def collect_normalize_evidence(
             raise TypeError(f"evidence for {atom_id} must be list")
 
         items: list[Evidence] = []
-        seen_sources: set[str] = set()
+        seen_evidence_ids: set[str] = set()
 
         for index, raw in enumerate(raw_items):
             path = f"evidence_by_atom.{atom_id}[{index}]"
@@ -374,11 +393,20 @@ def collect_normalize_evidence(
                 )
 
             source_id = _record_string(obj.get("source_id"), f"{path}.source_id")
-            if source_id in seen_sources:
+            evidence_id = _record_optional_string(
+                obj.get("evidence_id"),
+                f"{path}.evidence_id",
+            )
+            effective_id = evidence_id or source_id
+            if effective_id in seen_evidence_ids:
+                if evidence_id is None:
+                    raise ValueError(
+                        f"duplicate source_id for {atom_id}: {source_id}"
+                    )
                 raise ValueError(
-                    f"duplicate source_id for {atom_id}: {source_id}"
+                    f"duplicate evidence_id for {atom_id}: {effective_id}"
                 )
-            seen_sources.add(source_id)
+            seen_evidence_ids.add(effective_id)
 
             if "supports" not in obj:
                 raise ValueError(f"missing required field: {path}.supports")
@@ -407,11 +435,30 @@ def collect_normalize_evidence(
                         obj.get("eligible", True),
                         f"{path}.eligible",
                     ),
+                    evidence_id=evidence_id,
+                    source_role=_record_source_role(
+                        obj.get("source_role", SourceRole.EXTERNAL.value),
+                        f"{path}.source_role",
+                    ),
+                    source_ref=_record_optional_string(
+                        obj.get("source_ref"),
+                        f"{path}.source_ref",
+                    ),
+                    content_sha256=_record_optional_string(
+                        obj.get("content_sha256"),
+                        f"{path}.content_sha256",
+                    ),
                 )
             )
 
         normalized[atom_id] = tuple(
-            sorted(items, key=lambda item: item.source_id)
+            sorted(
+                items,
+                key=lambda item: (
+                    item.evidence_id or item.source_id,
+                    item.source_id,
+                ),
+            )
         )
 
     return normalized
