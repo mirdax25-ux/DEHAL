@@ -1,4 +1,4 @@
-from bodulskihal_core import Verdict
+from bodulskihal_core import Verdict, canonical_receipt_sha256
 from bodulskihal_core.lifecycle import (
     ProjectState,
     authorize_mutation,
@@ -197,3 +197,38 @@ def test_lifecycle_receipts_are_deterministic_for_same_inputs():
     )
 
     assert a.receipt == b.receipt
+
+
+def test_lifecycle_receipt_contains_verifiable_canonical_sha256():
+    result = freeze_project(
+        project_id="bodulskihal",
+        current_state=ProjectState.ACTIVE,
+        checkpoint_digest="sha256:abc",
+        checkpoint_verified=True,
+        human_approved=True,
+        policy_version="2.0",
+    )
+
+    assert len(result.receipt["receipt_sha256"]) == 64
+    assert result.receipt["receipt_sha256"] == canonical_receipt_sha256(result.receipt)
+
+
+def test_reopen_reason_changes_lifecycle_receipt_hash():
+    first = reopen_project(
+        project_id="bodulskihal",
+        current_state=ProjectState.FROZEN,
+        checkpoint_digest="sha256:abc",
+        reopen_reason="verified defect A",
+        human_approved=True,
+        policy_version="2.0",
+    )
+    second = reopen_project(
+        project_id="bodulskihal",
+        current_state=ProjectState.FROZEN,
+        checkpoint_digest="sha256:abc",
+        reopen_reason="verified defect B",
+        human_approved=True,
+        policy_version="2.0",
+    )
+
+    assert first.receipt["receipt_sha256"] != second.receipt["receipt_sha256"]
