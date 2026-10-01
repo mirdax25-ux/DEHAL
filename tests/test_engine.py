@@ -264,8 +264,9 @@ def test_blocked_claim_emits_failure_evolution_record():
     )
     assert result.failure_record is not None
     assert result.failure_record["failure_mode"] == "insufficient_eligible_evidence"
-    assert result.failure_record["regression_test_required"] is True
-    assert result.failure_record["version_change_required"] is True
+    assert result.failure_record["record_type"] == "expected_gate"
+    assert result.failure_record["regression_test_required"] is False
+    assert result.failure_record["version_change_required"] is False
 
 
 def test_approved_claim_has_no_failure_evolution_record():
