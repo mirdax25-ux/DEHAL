@@ -251,7 +251,7 @@ def test_receipt_records_algorithm_and_policy_versions():
         policy=POLICY,
         evaluation_time=T0,
     )
-    assert result.receipt["algorithm_version"] == "1.0.0"
+    assert result.receipt["algorithm_version"] == "2.0.0"
     assert result.receipt["policy_version"] == "1.0"
 
 
