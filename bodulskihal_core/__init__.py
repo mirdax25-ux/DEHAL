@@ -33,8 +33,27 @@ __all__ = [
     "verify_compound_payload",
     "run_research_demo",
     "evaluate_benchmark",
+    "SpeakerRole",
+    "AtomStatus",
+    "RawResponseEnvelope",
+    "ClaimAtom",
+    "EvidenceContract",
+    "bind_atom",
+    "atomize_raw_response",
+    "build_evidence_contract",
 ]
 
 from .adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
 from .evaluation import evaluate_benchmark
 from .research_demo import run_research_demo
+
+from .raw_pipeline import (
+    AtomStatus,
+    ClaimAtom,
+    EvidenceContract,
+    RawResponseEnvelope,
+    SpeakerRole,
+    atomize_raw_response,
+    bind_atom,
+    build_evidence_contract,
+)
