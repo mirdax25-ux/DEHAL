@@ -1,92 +1,44 @@
 {
-  "artifact": "BodulskiHal package v1.1.0 release-candidate branch",
-  "package_version": "1.1.0",
+  "artifact": "BodulskiHal Research-Agent Evidence Demo v1.2 candidate",
+  "package_version": "1.2.0",
   "algorithm_version": "1.0.0",
   "json_schema_version": 1,
-  "verification_scope": "package/core adapter scope only; not complete BodulAI deployment",
-  "local_test_result": "40 passed",
-  "adapter_differential_base_cases": 128,
-  "adapter_differential_comparisons": 256,
-  "local_compileall": "PASS",
-  "system_editable_install_smoke": "PASS",
-  "local_clean_venv_editable_install": "UNKNOWN_ENVIRONMENT: setuptools.build_meta unavailable in runner venv",
-  "github_pr_ci": {
-    "run_id": 36812528208,
+  "verification_scope": "deterministic supplied-evidence research demo; not arbitrary live research or complete BodulAI deployment",
+  "tests": {
+    "count": 46,
     "result": "PASS",
-    "python_versions": [
-      "3.10",
-      "3.11",
-      "3.13"
-    ],
-    "per_job_required_steps": [
-      "install package and test runner",
-      "compile",
-      "40 tests",
-      "demo smoke"
-    ],
-    "all_jobs_conclusion": "success"
+    "red_module_missing_observed": true,
+    "red_fixture_missing_observed": true
   },
-  "independent_adapter_code_review_issues": 0,
-  "source_files": [
-    {
-      "path": "README.md",
-      "bytes": 2871,
-      "sha256": "18c41751a69553d5fe62c098839b7f87efe8fc79e1c9c1431097fed220f808ec"
-    },
-    {
-      "path": "CHANGELOG.md",
-      "bytes": 4207,
-      "sha256": "3c5615dfbfd3220e30532de2b8513df8227efa3835b0b1276d9cb5da81a2e1af"
-    },
-    {
-      "path": "JSON_CONTRACT.md",
-      "bytes": 1718,
-      "sha256": "7caa15b74406af8105c7a794904ec7ba04cb32321a12479a7990c44839a81f9c"
-    },
-    {
-      "path": "pyproject.toml",
-      "bytes": 316,
-      "sha256": "90bd8432e179b4576f3b8f107f283a39bd2e9131f6152b1de2dc1a1f75663238"
-    },
-    {
-      "path": "bodulskihal_core/__init__.py",
-      "bytes": 662,
-      "sha256": "3af6a295093c2c55e6b6ffb0d92fd2d92336ea1666f06ba5a8fbb6afbc097d52"
-    },
-    {
-      "path": "bodulskihal_core/engine.py",
-      "bytes": 9975,
-      "sha256": "6bf60b1b51425d3f9b0a600c4c6f071e97a223aa899f44cf2b2543fe0d0913e8"
-    },
-    {
-      "path": "bodulskihal_core/adapter.py",
-      "bytes": 6748,
-      "sha256": "3e43692caf1c0f0854e85f5348c7b6872aeed1ed293774dfa910629ba613e2e2"
-    },
-    {
-      "path": "examples/demo.py",
-      "bytes": 671,
-      "sha256": "08ea1ad12c9b062e5848259526fcd7784472b38dd5ea17088138d3ed02c96276"
-    },
-    {
-      "path": "tests/test_engine.py",
-      "bytes": 11517,
-      "sha256": "07af0317deced6e312afdfe8928f25be0ac36fe2da60954ce3de017059564aa4"
-    },
-    {
-      "path": "tests/test_invariants.py",
-      "bytes": 3684,
-      "sha256": "f5ea259694fd1236bd456ec30a0b48449bb415a36e2626565faf59e090299180"
-    },
-    {
-      "path": "tests/test_adapter.py",
-      "bytes": 4306,
-      "sha256": "7f007df50eb62824664e764bcefef9d9f87543bf118e759cb52916ddff684c61"
-    },
-    {
-      "path": "tests/test_adapter_differential.py",
-      "bytes": 3020,
-      "sha256": "5dd221f9428744e2f3beb16facbbf3046ec8f52a727a2858baa7072e2b01a2d9"
-    }
+  "ci_evidence_before_manifest_snapshot": {
+    "run_id": 36813448513,
+    "python_versions": ["3.10", "3.11", "3.13"],
+    "all_jobs_conclusion": "success",
+    "required_steps": [
+      "package install",
+      "compile",
+      "46 tests",
+      "demo smoke",
+      "research demo smoke"
+    ]
+  },
+  "research_fixture": {
+    "total_claims": 5,
+    "verified_fact_count": 1,
+    "unknown_blocked_count": 1,
+    "conflict_blocked_count": 1,
+    "action_gate_blocked_count": 1,
+    "escalated_count": 1,
+    "blocked_unsupported_claim_count": 1,
+    "evidence_coverage": 0.8,
+    "overall_verdict": "ESCALATE"
+  },
+  "independent_research_demo_review_issues": 0,
+  "boundaries": [
+    "supplied evidence is not automatically authenticated",
+    "evidence coverage is not a truth score",
+    "no claim of general hallucination elimination",
+    "no claim of production deployment",
+    "no claim that complete BodulAI is verified ready"
   ]
 }
