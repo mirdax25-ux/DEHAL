@@ -35,8 +35,13 @@
 - [ ] Reconfirm final word count after any edits.
 - [ ] Reconfirm official deadline and form availability.
 - [ ] Review form privacy/terms and any funding-conflict question.
-- [ ] Human approves final proposal text.
+- [x] Human approves final proposal text.
 - [ ] Human approves external submission.
+
+## Repository approval status
+
+- [x] Grant package PR #7 merged to `main` after human approval.
+- [x] Final proposal text approved by human owner.
 
 ## External action status
 
