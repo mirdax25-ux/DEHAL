@@ -39,3 +39,6 @@ jobs:
 
       - name: Demo smoke
         run: python examples/demo.py
+
+      - name: Research demo smoke
+        run: python examples/research_demo.py
