@@ -27,6 +27,22 @@ Required proposal headings:
 8. FIT WITH DIGITAL SCIENCE
 9. BUDGET
 
+## Digital Science MCP fit
+
+Dimensions MCP:
+https://www.digital-science.com/press-releases/ai-agents-research-data-dimensions-mcp-servers/
+
+Altmetric MCP:
+https://www.digital-science.com/press-releases/research-impact-data-into-ai-workflows-with-altmetric-mcp/
+
+Current official positioning:
+- Dimensions MCP gives enterprise AI agents access to interconnected research records.
+- Altmetric MCP connects AI agents to research-attention data.
+- This creates a concrete integration hypothesis for BodulskiHal: research data enters through MCP; a separate verification layer evaluates downstream claims, contradictions, action-state evidence and human escalation.
+
+Important:
+No Digital Science integration is currently implemented or agreed.
+
 ## Adjacent products / competitor notes
 
 ### Scite
