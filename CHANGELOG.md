@@ -30,6 +30,7 @@
 - GUARDRAIL: classify as environment/setup until independent CI install proves the package path; do not convert it to product failure or PASS.
 - REGRESSION TEST: GitHub PR CI is required before merge.
 - VERSION CHANGE: v1.1 remains release-candidate branch until CI evidence is observed.
+- RESOLUTION: GitHub PR CI run 36812528208 independently installed the package and passed compile, 40 tests, and demo smoke on Python 3.10, 3.11, and 3.13.
 
 ## v1.0.0 — reference implementation checkpoint
 
