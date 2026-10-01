@@ -64,6 +64,12 @@ print(result.verdict.value)         # APPROVE
 print(result.receipt)
 ```
 
+## JSON adapter (package v1.1.0)
+
+The v1.1 package adds a strict transport adapter without changing the v1.0 core algorithm. Use `verify_payload(...)` or `verify_compound_payload(...)` for JSON-shaped input. See `JSON_CONTRACT.md`.
+
+The adapter is deliberately offline: it parses and validates supplied data, then delegates to the deterministic core. It does not fetch or authenticate external sources.
+
 ## Tests
 
 Run:
@@ -73,6 +79,9 @@ python -m pytest
 ```
 
 Current source checkpoint includes:
+
+- strict JSON adapter tests
+- 128-case adapter/core differential check (256 human-gate comparisons)
 
 - unit/negative tests
 - deterministic receipt tests

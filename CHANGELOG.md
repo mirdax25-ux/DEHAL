@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.1.0 — JSON adapter release candidate
+
+### Adapter
+- Added strict JSON-shaped single and compound verification adapters.
+- Added schema version `1` and JSON-safe result serialization.
+- Added timezone-aware ISO 8601 parsing with `Z` support.
+- Added strict boolean/integer validation and unknown-ID rejection.
+- Preserved the v1.0 deterministic core without verdict-logic changes.
+
+### Verification
+- Added 10 adapter behavior/negative tests.
+- Added a differential test covering 128 boolean core cases with both human-approval states (256 adapter/core comparisons).
+- Full local source suite: 40 tests.
+- Independent adapter code review reported 0 issues.
+
+### Error → Evolution
+
+#### BH-ADP-001 — Direct demo execution before installation
+- FAILURE MODE: `python examples/demo.py` from an uninstalled source checkout could not import `bodulskihal_core`.
+- ROOT CAUSE: direct script execution sets the import root to the examples directory and the package had not been installed.
+- GUARDRAIL: installation smoke precedes demo claims; CI installs the package before tests.
+- REGRESSION TEST: system editable-install smoke followed by demo returned `FACT APPROVE`.
+- VERSION CHANGE: packaging/test procedure clarified; core logic unchanged.
+
+#### BH-ADP-002 — Clean venv build backend unavailable in current runner
+- FAILURE MODE: editable install in a newly created Python 3.13 venv failed before project metadata loading.
+- ROOT CAUSE: the runner venv could not import `setuptools.build_meta`.
+- GUARDRAIL: classify as environment/setup until independent CI install proves the package path; do not convert it to product failure or PASS.
+- REGRESSION TEST: GitHub PR CI is required before merge.
+- VERSION CHANGE: v1.1 remains release-candidate branch until CI evidence is observed.
+- RESOLUTION: GitHub PR CI run 36812528208 independently installed the package and passed compile, 40 tests, and demo smoke on Python 3.10, 3.11, and 3.13.
+
 ## v1.0.0 — reference implementation checkpoint
 
 ### Core
