@@ -7,11 +7,13 @@ from .engine import (
     Directness,
     Evidence,
     Policy,
+    SourceRole,
     RiskLevel,
     VerificationResult,
     Verdict,
     verify_claim,
     verify_compound,
+    canonical_receipt_sha256,
 )
 
 __all__ = [
@@ -23,11 +25,13 @@ __all__ = [
     "Directness",
     "Evidence",
     "Policy",
+    "SourceRole",
     "RiskLevel",
     "VerificationResult",
     "Verdict",
     "verify_claim",
     "verify_compound",
+    "canonical_receipt_sha256",
     "SCHEMA_VERSION",
     "verify_payload",
     "verify_compound_payload",
