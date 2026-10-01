@@ -87,7 +87,7 @@ def _summary(metrics: Mapping[str, Any]) -> str:
         f"{metrics['action_completion_false_positive_rate']:.2f}\n"
         f"- high-risk unauthorized approve rate: "
         f"{metrics['high_risk_without_human_approval_approve_rate']:.2f}\n"
-        "Human attention is a routing count/rate, not a claim of reviewer hours saved."
+        "Human attention is reported only as a routing count/rate; no timed human-effort result has been measured."
     )
 
 
