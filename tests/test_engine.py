@@ -356,3 +356,47 @@ def test_compound_rejects_duplicate_claim_ids():
 def test_empty_compound_does_not_vacuously_approve():
     with pytest.raises(ValueError, match="at least one claim"):
         verify_compound([], {}, policy=POLICY, evaluation_time=T0)
+
+
+@pytest.mark.parametrize("bad_id", ["", "   "])
+def test_core_rejects_blank_claim_id(bad_id):
+    with pytest.raises(ValueError, match="claim_id must be non-empty string"):
+        verify_claim(
+            Claim(bad_id, "File exists", ClaimType.OBSERVATION),
+            [ev("filesystem")],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+@pytest.mark.parametrize("bad_text", ["", "   "])
+def test_core_rejects_blank_claim_text(bad_text):
+    with pytest.raises(ValueError, match="claim.text must be non-empty string"):
+        verify_claim(
+            Claim("c1", bad_text, ClaimType.OBSERVATION),
+            [ev("filesystem")],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+@pytest.mark.parametrize("bad_source_id", ["", "   "])
+def test_core_rejects_blank_evidence_source_id(bad_source_id):
+    with pytest.raises(ValueError, match="evidence.source_id must be non-empty string"):
+        verify_claim(
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [ev(bad_source_id)],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+@pytest.mark.parametrize("bad_version", ["", "   "])
+def test_core_rejects_blank_policy_version(bad_version):
+    with pytest.raises(ValueError, match="policy.version must be non-empty string"):
+        verify_claim(
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [ev("filesystem")],
+            policy=Policy(version=bad_version, max_age_seconds=300),
+            evaluation_time=T0,
+        )
