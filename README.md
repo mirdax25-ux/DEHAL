@@ -6,7 +6,7 @@ Evidence-first verification for AI/agent claims.
 
 - **Core algorithm:** v1.0.0
 - **JSON transport adapter:** schema v1
-- **Package:** v1.3.0
+- **Package:** v1.3.1
 - **Research-Agent Evidence Demo:** v1.2
 - **Evaluation Harness / Grant Metrics:** v1.3
 
@@ -38,6 +38,7 @@ Verdicts are:
 6. Compound verification requires every consequential clause to pass.
 7. Duplicate evidence/claim identities are rejected.
 8. Naive timestamps, invalid freshness windows and empty compounds fail closed.
+9. Human approval must be an explicit boolean; truthy strings/numbers fail closed.
 
 ## JSON adapter
 
@@ -103,7 +104,7 @@ See `EVALUATION_HARNESS.md`.
 python -m pytest
 ```
 
-The v1.3 candidate contains 53 tests before final packaging/doc CI.
+The v1.3.1 candidate contains 68 tests in the verified PR-head suite.
 
 ## Determinism boundary
 
