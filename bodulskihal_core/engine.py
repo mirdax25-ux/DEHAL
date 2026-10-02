@@ -89,6 +89,21 @@ def _is_aware(value: datetime) -> bool:
     return value.tzinfo is not None and value.utcoffset() is not None
 
 
+def _validate_non_empty_string(value: object, field_name: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be non-empty string")
+
+
+def _validate_provenance_inputs(
+    claim: Claim, evidence: Sequence[Evidence], policy: Policy
+) -> None:
+    _validate_non_empty_string(claim.claim_id, "claim_id")
+    _validate_non_empty_string(claim.text, "claim.text")
+    _validate_non_empty_string(policy.version, "policy.version")
+    for item in evidence:
+        _validate_non_empty_string(item.source_id, "evidence.source_id")
+
+
 def _validate_common_inputs(
     evidence: Sequence[Evidence], *, policy: Policy, evaluation_time: datetime
 ) -> None:
@@ -266,6 +281,7 @@ def verify_claim(
     human_approved: bool = False,
 ) -> VerificationResult:
     evidence_seq = tuple(evidence)
+    _validate_provenance_inputs(claim, evidence_seq, policy)
     _validate_evidence_identity(evidence_seq)
     _validate_common_inputs(evidence_seq, policy=policy, evaluation_time=evaluation_time)
 
