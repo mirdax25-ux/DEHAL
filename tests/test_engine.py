@@ -423,3 +423,53 @@ def test_core_rejects_blank_policy_version(bad_version):
             policy=Policy(version=bad_version, max_age_seconds=300),
             evaluation_time=T0,
         )
+
+
+def test_core_rejects_non_boolean_evidence_supports():
+    malformed = Evidence(
+        source_id="bad-supports",
+        supports="false",  # type: ignore[arg-type]
+        observed_at=T0,
+        directness=Directness.DIRECT,
+    )
+    with pytest.raises(TypeError, match="evidence.supports must be bool"):
+        verify_claim(
+            Claim("c1", "Service healthy", ClaimType.OBSERVATION),
+            [malformed],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+def test_core_rejects_non_boolean_post_action_instead_of_approving_completion():
+    malformed = Evidence(
+        source_id="bad-post-action",
+        supports=True,
+        observed_at=T0,
+        directness=Directness.DIRECT,
+        post_action="false",  # type: ignore[arg-type]
+    )
+    with pytest.raises(TypeError, match="evidence.post_action must be bool"):
+        verify_claim(
+            Claim("c1", "Email sent", ClaimType.ACTION_STATE),
+            [malformed],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+def test_core_rejects_non_boolean_evidence_eligible():
+    malformed = Evidence(
+        source_id="bad-eligible",
+        supports=True,
+        observed_at=T0,
+        directness=Directness.DIRECT,
+        eligible="false",  # type: ignore[arg-type]
+    )
+    with pytest.raises(TypeError, match="evidence.eligible must be bool"):
+        verify_claim(
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [malformed],
+            policy=POLICY,
+            evaluation_time=T0,
+        )

@@ -149,6 +149,16 @@ def _validate_common_inputs(
                 raise ValueError("content_sha256 must be a 64-character hexadecimal SHA-256")
 
 
+def _validate_evidence_gate_types(evidence: Sequence[Evidence]) -> None:
+    for item in evidence:
+        if type(item.supports) is not bool:
+            raise TypeError("evidence.supports must be bool")
+        if type(item.post_action) is not bool:
+            raise TypeError("evidence.post_action must be bool")
+        if type(item.eligible) is not bool:
+            raise TypeError("evidence.eligible must be bool")
+
+
 def _validate_evidence_identity(evidence: Sequence[Evidence]) -> None:
     ids = [_effective_evidence_id(item) for item in evidence]
     if len(ids) != len(set(ids)):
@@ -436,6 +446,7 @@ def verify_claim(
     _validate_human_approval(human_approved)
     evidence_seq = tuple(evidence)
     _validate_provenance_inputs(claim, evidence_seq, policy)
+    _validate_evidence_gate_types(evidence_seq)
     _validate_evidence_identity(evidence_seq)
     _validate_common_inputs(evidence_seq, policy=policy, evaluation_time=evaluation_time)
 
