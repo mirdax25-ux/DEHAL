@@ -11,6 +11,7 @@ ALGORITHM_VERSION = "2.0.0"
 
 
 class ClaimType(str, Enum):
+    UNCLASSIFIED = "unclassified"
     OBSERVATION = "observation"
     INFERENCE = "inference"
     ESTIMATE = "estimate"
@@ -153,6 +154,9 @@ def _eligible_evidence(
 
 
 def _classify(claim: Claim, eligible: Sequence[Evidence]) -> Classification:
+    if claim.claim_type is ClaimType.UNCLASSIFIED:
+        return Classification.UNKNOWN
+
     if any(not item.supports for item in eligible):
         return Classification.CONFLICT
 
@@ -210,6 +214,9 @@ def _decide_verdict(
     policy: Policy,
     human_approved: bool,
 ) -> tuple[Verdict, str]:
+    if claim.claim_type is ClaimType.UNCLASSIFIED:
+        return Verdict.BLOCK, "unclassified_claim"
+
     if classification is Classification.CONFLICT:
         return Verdict.BLOCK, "eligible_contradiction"
     if classification is Classification.UNKNOWN:
@@ -378,7 +385,11 @@ def _make_receipt(
                 "source_id": item.source_id,
                 "source_role": item.source_role.value,
                 "source_ref": item.source_ref,
-                "content_sha256": item.content_sha256,
+                "content_sha256": (
+                    item.content_sha256.lower()
+                    if item.content_sha256 is not None
+                    else None
+                ),
                 "supports": item.supports,
                 "observed_at": _iso(item.observed_at),
                 "directness": item.directness.value,
