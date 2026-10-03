@@ -7,7 +7,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Iterable, Mapping, Sequence
 
-ALGORITHM_VERSION = "2.0.0"
+from .runtime_provenance import RuntimeProvenance, current_runtime_provenance
+
+ALGORITHM_VERSION = "2.1.0"
 
 
 class ClaimType(str, Enum):
@@ -24,6 +26,7 @@ class Classification(str, Enum):
     INFERENCE = "INFERENCE"
     ESTIMATE = "ESTIMATE"
     UNKNOWN = "UNKNOWN"
+    REFUTED = "REFUTED"
     CONFLICT = "CONFLICT"
 
 
@@ -50,6 +53,35 @@ class SourceRole(str, Enum):
     EXTERNAL = "external"
 
 
+class EvidenceOrigin(str, Enum):
+    EXTERNAL_SOURCE = "external_source"
+    TOOL_OBSERVATION = "tool_observation"
+    COMPUTED_RESULT = "computed_result"
+    MEMORY = "memory"
+    USER_ASSERTION = "user_assertion"
+    USER_SELF_REPORT = "user_self_report"
+    USER_PREFERENCE = "user_preference"
+    USER_INSTRUCTION = "user_instruction"
+
+
+class AuthorityScope(str, Enum):
+    EXTERNAL_FACT = "external_fact"
+    SYSTEM_STATE = "system_state"
+    USER_SELF_REPORT = "user_self_report"
+    USER_PREFERENCE = "user_preference"
+    USER_INSTRUCTION = "user_instruction"
+
+
+class AnswerabilityStatus(str, Enum):
+    ANSWERABLE = "answerable"
+    PARTIALLY_ANSWERABLE = "partially_answerable"
+    UNDERSPECIFIED = "underspecified"
+    FALSE_PREMISE = "false_premise"
+    CONTRADICTORY_INPUT = "contradictory_input"
+    NEEDS_CLARIFICATION = "needs_clarification"
+    OUT_OF_SCOPE = "out_of_scope"
+
+
 @dataclass(frozen=True)
 class Claim:
     claim_id: str
@@ -57,6 +89,8 @@ class Claim:
     claim_type: ClaimType
     risk: RiskLevel = RiskLevel.LOW
     consequential: bool = True
+    authority_scope: AuthorityScope = AuthorityScope.EXTERNAL_FACT
+    answerability: AnswerabilityStatus = AnswerabilityStatus.ANSWERABLE
 
 
 @dataclass(frozen=True)
@@ -71,6 +105,8 @@ class Evidence:
     source_role: SourceRole = SourceRole.EXTERNAL
     source_ref: str | None = None
     content_sha256: str | None = None
+    origin: EvidenceOrigin = EvidenceOrigin.EXTERNAL_SOURCE
+    authority_scope: AuthorityScope = AuthorityScope.EXTERNAL_FACT
 
 
 @dataclass(frozen=True)
@@ -80,6 +116,7 @@ class Policy:
     reject_future_evidence: bool = True
     require_independent_action_evidence: bool = True
     medium_risk_min_independent_sources: int = 2
+    require_runtime_provenance: bool = False
 
 
 @dataclass(frozen=True)
@@ -122,8 +159,16 @@ def _validate_provenance_inputs(
     _validate_non_empty_string(claim.claim_id, "claim_id")
     _validate_non_empty_string(claim.text, "claim.text")
     _validate_non_empty_string(policy.version, "policy.version")
+    if not isinstance(claim.authority_scope, AuthorityScope):
+        raise TypeError("claim.authority_scope must be AuthorityScope")
+    if not isinstance(claim.answerability, AnswerabilityStatus):
+        raise TypeError("claim.answerability must be AnswerabilityStatus")
     for item in evidence:
         _validate_non_empty_string(item.source_id, "evidence.source_id")
+        if not isinstance(item.origin, EvidenceOrigin):
+            raise TypeError("evidence.origin must be EvidenceOrigin")
+        if not isinstance(item.authority_scope, AuthorityScope):
+            raise TypeError("evidence.authority_scope must be AuthorityScope")
 
 
 
@@ -136,6 +181,8 @@ def _validate_common_inputs(
         raise ValueError("max_age_seconds must be non-negative")
     if policy.medium_risk_min_independent_sources < 1:
         raise ValueError("medium_risk_min_independent_sources must be at least 1")
+    if type(policy.require_runtime_provenance) is not bool:
+        raise TypeError("require_runtime_provenance must be bool")
     for item in evidence:
         if not _is_aware(item.observed_at):
             raise ValueError("observed_at must be timezone-aware")
@@ -184,14 +231,63 @@ def _eligible_evidence(
     )
 
 
+_USER_ORIGINS = {
+    EvidenceOrigin.USER_ASSERTION,
+    EvidenceOrigin.USER_SELF_REPORT,
+    EvidenceOrigin.USER_PREFERENCE,
+    EvidenceOrigin.USER_INSTRUCTION,
+}
+
+
+def _authority_allows(claim: Claim, item: Evidence) -> bool:
+    if item.authority_scope is not claim.authority_scope:
+        return False
+
+    if claim.authority_scope in {AuthorityScope.EXTERNAL_FACT, AuthorityScope.SYSTEM_STATE}:
+        return item.origin in {
+            EvidenceOrigin.EXTERNAL_SOURCE,
+            EvidenceOrigin.TOOL_OBSERVATION,
+            EvidenceOrigin.COMPUTED_RESULT,
+        }
+    if claim.authority_scope is AuthorityScope.USER_PREFERENCE:
+        return item.origin in {
+            EvidenceOrigin.USER_PREFERENCE,
+            EvidenceOrigin.USER_SELF_REPORT,
+            EvidenceOrigin.TOOL_OBSERVATION,
+        }
+    if claim.authority_scope is AuthorityScope.USER_INSTRUCTION:
+        return item.origin in {
+            EvidenceOrigin.USER_INSTRUCTION,
+            EvidenceOrigin.TOOL_OBSERVATION,
+        }
+    if claim.authority_scope is AuthorityScope.USER_SELF_REPORT:
+        return item.origin in {
+            EvidenceOrigin.USER_SELF_REPORT,
+            EvidenceOrigin.TOOL_OBSERVATION,
+        }
+    return False
+
+
+def _authorized_evidence(
+    claim: Claim, evidence: Sequence[Evidence]
+) -> tuple[Evidence, ...]:
+    return tuple(item for item in evidence if _authority_allows(claim, item))
+
+
 def _classify(claim: Claim, eligible: Sequence[Evidence]) -> Classification:
+    if claim.answerability is AnswerabilityStatus.CONTRADICTORY_INPUT:
+        return Classification.CONFLICT
+    if claim.answerability is not AnswerabilityStatus.ANSWERABLE:
+        return Classification.UNKNOWN
     if claim.claim_type is ClaimType.UNCLASSIFIED:
         return Classification.UNKNOWN
 
-    if any(not item.supports for item in eligible):
-        return Classification.CONFLICT
-
     supporting = tuple(item for item in eligible if item.supports)
+    contradicting = tuple(item for item in eligible if not item.supports)
+    if supporting and contradicting:
+        return Classification.CONFLICT
+    if contradicting:
+        return Classification.REFUTED
     if not supporting:
         return Classification.UNKNOWN
 
@@ -244,13 +340,26 @@ def _decide_verdict(
     *,
     policy: Policy,
     human_approved: bool,
+    authority_rejected: bool = False,
+    runtime_provenance_verified: bool = False,
 ) -> tuple[Verdict, str]:
+    if policy.require_runtime_provenance and not runtime_provenance_verified:
+        return Verdict.BLOCK, "runtime_provenance_unverified"
+
+    if claim.answerability is AnswerabilityStatus.NEEDS_CLARIFICATION:
+        return Verdict.ESCALATE, "answerability_needs_clarification"
+    if claim.answerability is not AnswerabilityStatus.ANSWERABLE:
+        return Verdict.BLOCK, f"answerability_{claim.answerability.value}"
     if claim.claim_type is ClaimType.UNCLASSIFIED:
         return Verdict.BLOCK, "unclassified_claim"
 
     if classification is Classification.CONFLICT:
         return Verdict.BLOCK, "eligible_contradiction"
+    if classification is Classification.REFUTED:
+        return Verdict.BLOCK, "claim_refuted_by_eligible_evidence"
     if classification is Classification.UNKNOWN:
+        if authority_rejected:
+            return Verdict.BLOCK, "insufficient_authorized_evidence"
         return Verdict.BLOCK, "insufficient_eligible_evidence"
     if classification is Classification.INFERENCE:
         return Verdict.BLOCK, "inference_not_fact"
@@ -350,6 +459,8 @@ def _make_receipt(
     verdict: Verdict,
     reason: str,
     human_approved: bool,
+    authority_rejected: Sequence[Evidence] = (),
+    runtime_provenance: RuntimeProvenance | None = None,
 ) -> dict:
     eligible_ids = {_effective_evidence_id(item) for item in eligible}
     sorted_all = sorted(
@@ -380,11 +491,18 @@ def _make_receipt(
             "type": claim.claim_type.value,
             "risk": claim.risk.value,
             "consequential": claim.consequential,
+            "authority_scope": claim.authority_scope.value,
+            "answerability": claim.answerability.value,
         },
         "classification": classification.value,
         "verdict": verdict.value,
         "reason": reason,
         "human_approved": human_approved,
+        "runtime_provenance": (
+            runtime_provenance.as_dict()
+            if runtime_provenance is not None
+            else current_runtime_provenance().as_dict()
+        ),
         "gates": {
             "eligible_source_count": len(eligible),
             "supporting_sources": supporting_sources,
@@ -392,6 +510,9 @@ def _make_receipt(
             "supporting_evidence_ids": supporting_evidence_ids,
             "contradicting_evidence_ids": contradicting_evidence_ids,
             "contradiction_count": len(contradicting_evidence_ids),
+            "authority_rejected_evidence_ids": sorted(
+                _effective_evidence_id(item) for item in authority_rejected
+            ),
             "post_action_verified": (
                 _has_direct_post_action_evidence(eligible)
                 if claim.claim_type is ClaimType.ACTION_STATE
@@ -409,6 +530,7 @@ def _make_receipt(
                 else None
             ),
             "human_gate": human_gate,
+            "runtime_provenance_required": policy.require_runtime_provenance,
         },
         "evidence": [
             {
@@ -421,6 +543,8 @@ def _make_receipt(
                     if item.content_sha256 is not None
                     else None
                 ),
+                "origin": item.origin.value,
+                "authority_scope": item.authority_scope.value,
                 "supports": item.supports,
                 "observed_at": _iso(item.observed_at),
                 "directness": item.directness.value,
@@ -450,11 +574,16 @@ def verify_claim(
     _validate_evidence_identity(evidence_seq)
     _validate_common_inputs(evidence_seq, policy=policy, evaluation_time=evaluation_time)
 
-    eligible = _eligible_evidence(
+    fresh_eligible = _eligible_evidence(
         evidence_seq,
         policy=policy,
         evaluation_time=evaluation_time,
     )
+    eligible = _authorized_evidence(claim, fresh_eligible)
+    authority_rejected = tuple(
+        item for item in fresh_eligible if item not in eligible
+    )
+    runtime_provenance = current_runtime_provenance()
     classification = _classify(claim, eligible)
     verdict, reason = _decide_verdict(
         claim,
@@ -462,6 +591,8 @@ def verify_claim(
         eligible,
         policy=policy,
         human_approved=human_approved,
+        authority_rejected=bool(authority_rejected),
+        runtime_provenance_verified=runtime_provenance.verified,
     )
     receipt = _make_receipt(
         claim=claim,
@@ -473,6 +604,8 @@ def verify_claim(
         verdict=verdict,
         reason=reason,
         human_approved=human_approved,
+        authority_rejected=authority_rejected,
+        runtime_provenance=runtime_provenance,
     )
     failure_record = _make_failure_record(claim, verdict, reason)
     return VerificationResult(

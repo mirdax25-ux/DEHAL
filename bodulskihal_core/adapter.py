@@ -5,10 +5,13 @@ from typing import Any, Mapping
 
 from .engine import (
     ALGORITHM_VERSION,
+    AnswerabilityStatus,
+    AuthorityScope,
     Claim,
     ClaimType,
     Directness,
     Evidence,
+    EvidenceOrigin,
     Policy,
     RiskLevel,
     SourceRole,
@@ -16,7 +19,7 @@ from .engine import (
     verify_compound,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _mapping(value: Any, path: str) -> Mapping[str, Any]:
@@ -90,6 +93,16 @@ def _claim(raw: Any, path: str = "claim") -> Claim:
         claim_type=_enum(ClaimType, _required(obj, "type", path), f"{path}.type"),
         risk=_enum(RiskLevel, obj.get("risk", RiskLevel.LOW.value), f"{path}.risk"),
         consequential=_bool(obj.get("consequential", True), f"{path}.consequential"),
+        authority_scope=_enum(
+            AuthorityScope,
+            obj.get("authority_scope", AuthorityScope.EXTERNAL_FACT.value),
+            f"{path}.authority_scope",
+        ),
+        answerability=_enum(
+            AnswerabilityStatus,
+            obj.get("answerability", AnswerabilityStatus.ANSWERABLE.value),
+            f"{path}.answerability",
+        ),
     )
 
 
@@ -113,6 +126,16 @@ def _evidence(raw: Any, path: str) -> Evidence:
             obj.get("content_sha256"),
             f"{path}.content_sha256",
         ),
+        origin=_enum(
+            EvidenceOrigin,
+            obj.get("origin", EvidenceOrigin.EXTERNAL_SOURCE.value),
+            f"{path}.origin",
+        ),
+        authority_scope=_enum(
+            AuthorityScope,
+            obj.get("authority_scope", AuthorityScope.EXTERNAL_FACT.value),
+            f"{path}.authority_scope",
+        ),
     )
 
 
@@ -133,6 +156,10 @@ def _policy(raw: Any) -> Policy:
         medium_risk_min_independent_sources=_int(
             obj.get("medium_risk_min_independent_sources", 2),
             "policy.medium_risk_min_independent_sources",
+        ),
+        require_runtime_provenance=_bool(
+            obj.get("require_runtime_provenance", False),
+            "policy.require_runtime_provenance",
         ),
     )
 

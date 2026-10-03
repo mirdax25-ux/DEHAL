@@ -1,5 +1,40 @@
 # Changelog
 
+## v2.1.0 ? Integrated deterministic verification candidate
+
+### Integrated
+- MAIN + v2 core algorithm + raw-response evidence pipeline + ingestion pipeline + Guard Loop.
+- Strict human-approval, provenance-identifier and runtime boolean hardening.
+- Exact Floot rc.3 source snapshot and SHA-256 manifest for audit continuity.
+
+### Added from the real conversation benchmark
+- `REFUTED` classification for pure eligible counterevidence.
+- Evidence `origin` and `authority_scope`; user assertions no longer certify external facts by themselves.
+- Claim `answerability` and deterministic fail-closed handling for underspecified, false-premise, contradictory, clarification and out-of-scope states.
+- Structured `UnknownRecord` with severity, reviewed/resolved/blocking separation.
+- Deterministic conversation contract gate for goal, referent and active constraints.
+- Runtime source/build provenance receipt and optional hard gate.
+- Benchmark regression suite covering anchoring, referent drift, language/constraint persistence, counterevidence semantics, source independence and provenance.
+
+### Compatibility
+- Algorithm v2.1.0 and JSON schema v3.
+- New claim/evidence metadata has backward-compatible defaults inside the Python adapter.
+- Live Floot/native rc.3 transport is not modified by this integration candidate.
+
+### Verification so far
+- Local integrated suite: 208/208 PASS before GitHub CI.
+- `compileall` PASS.
+- `git diff --check` PASS.
+- Independent expert review of `engine.py`, `guard_loop.py` and `conversation_gate.py`: 0 issues reported.
+- GitHub CI and live deployment remain required before merge/release.
+
+### Failure ? Evolution
+- BH-REFUTED-001: UNKNOWN could hide direct refutation ? add REFUTED.
+- BH-AUTHORITY-001: user anchor could be represented as supplied fact ? add origin/authority gate.
+- BH-UNKNOWN-BLOCK-001: reviewed did not mean resolved ? add structured blocking unknowns.
+- BH-REFERENT-001: wrong active referent could survive to final answer ? add conversation contract gate.
+- BH-PROVENANCE-001: live build lacked immutable Git/build binding ? add runtime provenance receipt/gate.
+
 ## v1.3.1 — Strict Human-Approval Gate
 
 ### Fixed

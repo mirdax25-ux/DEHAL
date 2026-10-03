@@ -1,11 +1,14 @@
 from .engine import (
     ALGORITHM_VERSION,
+    AnswerabilityStatus,
+    AuthorityScope,
     Claim,
     ClaimType,
     Classification,
     CompoundResult,
     Directness,
     Evidence,
+    EvidenceOrigin,
     SourceRole,
     Policy,
     RiskLevel,
@@ -19,12 +22,15 @@ from .engine import (
 
 __all__ = [
     "ALGORITHM_VERSION",
+    "AnswerabilityStatus",
+    "AuthorityScope",
     "Claim",
     "ClaimType",
     "Classification",
     "CompoundResult",
     "Directness",
     "Evidence",
+    "EvidenceOrigin",
     "SourceRole",
     "Policy",
     "RiskLevel",
@@ -42,6 +48,8 @@ __all__ = [
     "GUARD_VERSION",
     "Realism",
     "GuardStage",
+    "UnknownSeverity",
+    "UnknownRecord",
     "SelfCheck",
     "GuardResult",
     "run_guard_loop",
@@ -58,6 +66,13 @@ __all__ = [
     "bind_atom",
     "atomize_raw_response",
     "build_evidence_contract",
+    "ConstraintRecord",
+    "ConversationContract",
+    "ConversationGateResult",
+    "canonical_conversation_contract_sha256",
+    "evaluate_conversation_contract",
+    "RuntimeProvenance",
+    "current_runtime_provenance",
 ]
 
 from .adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
@@ -70,6 +85,8 @@ from .guard_loop import (
     GuardStage,
     Realism,
     SelfCheck,
+    UnknownRecord,
+    UnknownSeverity,
     run_guard_loop,
 )
 
@@ -91,3 +108,13 @@ from .raw_pipeline import (
     bind_atom,
     build_evidence_contract,
 )
+
+from .conversation_gate import (
+    ConstraintRecord,
+    ConversationContract,
+    ConversationGateResult,
+    canonical_conversation_contract_sha256,
+    evaluate_conversation_contract,
+)
+
+from .runtime_provenance import RuntimeProvenance, current_runtime_provenance

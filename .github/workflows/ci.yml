@@ -2,12 +2,17 @@ name: BodulskiHal Core CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "integration/**"]
   pull_request:
     branches: [main]
 
 permissions:
   contents: read
+
+env:
+  BODULSKIHAL_SOURCE_COMMIT: ${{ github.sha }}
+  BODULSKIHAL_SOURCE_REF: ${{ github.ref }}
+  BODULSKIHAL_BUILD_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   verify:
@@ -36,6 +41,15 @@ jobs:
 
       - name: Test
         run: python -m pytest
+
+      - name: Runtime provenance gate
+        run: |
+          python - <<'PY'
+          from bodulskihal_core import current_runtime_provenance
+          p = current_runtime_provenance()
+          print(p)
+          assert p.verified, p
+          PY
 
       - name: Demo smoke
         run: python examples/demo.py

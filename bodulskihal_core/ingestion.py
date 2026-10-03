@@ -9,10 +9,12 @@ from enum import Enum
 from typing import Any, Mapping
 
 from .engine import (
+    AuthorityScope,
     Claim,
     ClaimType,
     Directness,
     Evidence,
+    EvidenceOrigin,
     Policy,
     RiskLevel,
     SourceRole,
@@ -303,6 +305,8 @@ _ALLOWED_EVIDENCE_KEYS = {
     "source_role",
     "source_ref",
     "content_sha256",
+    "origin",
+    "authority_scope",
 }
 
 
@@ -355,6 +359,22 @@ def _record_source_role(value: Any, path: str) -> SourceRole:
     raw = _record_string(value, path)
     try:
         return SourceRole(raw)
+    except ValueError as exc:
+        raise ValueError(f"invalid {path}: {raw}") from exc
+
+
+def _record_evidence_origin(value: Any, path: str) -> EvidenceOrigin:
+    raw = _record_string(value, path)
+    try:
+        return EvidenceOrigin(raw)
+    except ValueError as exc:
+        raise ValueError(f"invalid {path}: {raw}") from exc
+
+
+def _record_authority_scope(value: Any, path: str) -> AuthorityScope:
+    raw = _record_string(value, path)
+    try:
+        return AuthorityScope(raw)
     except ValueError as exc:
         raise ValueError(f"invalid {path}: {raw}") from exc
 
@@ -447,6 +467,14 @@ def collect_normalize_evidence(
                     content_sha256=_record_optional_string(
                         obj.get("content_sha256"),
                         f"{path}.content_sha256",
+                    ),
+                    origin=_record_evidence_origin(
+                        obj.get("origin", EvidenceOrigin.EXTERNAL_SOURCE.value),
+                        f"{path}.origin",
+                    ),
+                    authority_scope=_record_authority_scope(
+                        obj.get("authority_scope", AuthorityScope.EXTERNAL_FACT.value),
+                        f"{path}.authority_scope",
                     ),
                 )
             )

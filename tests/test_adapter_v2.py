@@ -39,7 +39,7 @@ def action_payload(source_role: str) -> dict:
 def test_adapter_parses_provenance_fields_and_blocks_executor_self_report():
     result = verify_payload(action_payload("executor"))
 
-    assert result["schema_version"] == 2
+    assert result["schema_version"] == 3
     assert result["verdict"] == "BLOCK"
     assert result["reason"] == "missing_independent_post_action_evidence"
     item = result["receipt"]["evidence"][0]
