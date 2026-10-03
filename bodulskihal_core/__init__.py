@@ -6,12 +6,15 @@ from .engine import (
     CompoundResult,
     Directness,
     Evidence,
+    SourceRole,
     Policy,
     RiskLevel,
     VerificationResult,
     Verdict,
     verify_claim,
     verify_compound,
+    canonical_receipt_sha256,
+    make_failure_evolution_record,
 )
 
 __all__ = [
@@ -22,12 +25,15 @@ __all__ = [
     "CompoundResult",
     "Directness",
     "Evidence",
+    "SourceRole",
     "Policy",
     "RiskLevel",
     "VerificationResult",
     "Verdict",
     "verify_claim",
     "verify_compound",
+    "canonical_receipt_sha256",
+    "make_failure_evolution_record",
     "SCHEMA_VERSION",
     "verify_payload",
     "verify_compound_payload",
@@ -39,6 +45,11 @@ __all__ = [
     "SelfCheck",
     "GuardResult",
     "run_guard_loop",
+    "ProjectState",
+    "LifecycleResult",
+    "freeze_project",
+    "authorize_mutation",
+    "reopen_project",
 ]
 
 from .adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
@@ -52,4 +63,12 @@ from .guard_loop import (
     Realism,
     SelfCheck,
     run_guard_loop,
+)
+
+from .lifecycle import (
+    LifecycleResult,
+    ProjectState,
+    authorize_mutation,
+    freeze_project,
+    reopen_project,
 )

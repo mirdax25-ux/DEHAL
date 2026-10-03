@@ -11,11 +11,12 @@ from .engine import (
     Evidence,
     Policy,
     RiskLevel,
+    SourceRole,
     verify_claim,
     verify_compound,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def _mapping(value: Any, path: str) -> Mapping[str, Any]:
@@ -40,6 +41,12 @@ def _string(value: Any, path: str) -> str:
     if not isinstance(value, str) or not value:
         raise TypeError(f"{path} must be non-empty string")
     return value
+
+
+def _optional_string(value: Any, path: str) -> str | None:
+    if value is None:
+        return None
+    return _string(value, path)
 
 
 def _bool(value: Any, path: str) -> bool:
@@ -95,6 +102,17 @@ def _evidence(raw: Any, path: str) -> Evidence:
         directness=_enum(Directness, _required(obj, "directness", path), f"{path}.directness"),
         post_action=_bool(obj.get("post_action", False), f"{path}.post_action"),
         eligible=_bool(obj.get("eligible", True), f"{path}.eligible"),
+        evidence_id=_optional_string(obj.get("evidence_id"), f"{path}.evidence_id"),
+        source_role=_enum(
+            SourceRole,
+            obj.get("source_role", SourceRole.EXTERNAL.value),
+            f"{path}.source_role",
+        ),
+        source_ref=_optional_string(obj.get("source_ref"), f"{path}.source_ref"),
+        content_sha256=_optional_string(
+            obj.get("content_sha256"),
+            f"{path}.content_sha256",
+        ),
     )
 
 
@@ -107,6 +125,14 @@ def _policy(raw: Any) -> Policy:
         reject_future_evidence=_bool(
             obj.get("reject_future_evidence", True),
             "policy.reject_future_evidence",
+        ),
+        require_independent_action_evidence=_bool(
+            obj.get("require_independent_action_evidence", True),
+            "policy.require_independent_action_evidence",
+        ),
+        medium_risk_min_independent_sources=_int(
+            obj.get("medium_risk_min_independent_sources", 2),
+            "policy.medium_risk_min_independent_sources",
         ),
     )
 
