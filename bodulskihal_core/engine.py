@@ -9,7 +9,7 @@ from typing import Iterable, Mapping, Sequence
 
 from .runtime_provenance import RuntimeProvenance, current_runtime_provenance
 
-ALGORITHM_VERSION = "2.1.0"
+ALGORITHM_VERSION = "2.1.1"
 
 
 class ClaimType(str, Enum):
@@ -104,6 +104,7 @@ class Evidence:
     evidence_id: str | None = None
     source_role: SourceRole = SourceRole.EXTERNAL
     source_ref: str | None = None
+    independence_group: str | None = None
     content_sha256: str | None = None
     origin: EvidenceOrigin = EvidenceOrigin.EXTERNAL_SOURCE
     authority_scope: AuthorityScope = AuthorityScope.EXTERNAL_FACT
@@ -190,6 +191,8 @@ def _validate_common_inputs(
             raise ValueError("evidence_id must be non-empty when supplied")
         if item.source_ref is not None and not item.source_ref.strip():
             raise ValueError("source_ref must be non-empty when supplied")
+        if item.independence_group is not None and not item.independence_group.strip():
+            raise ValueError("independence_group must be non-empty when supplied")
         if item.content_sha256 is not None:
             digest = item.content_sha256.lower()
             if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
@@ -321,10 +324,18 @@ def _has_independent_post_action_evidence(eligible: Sequence[Evidence]) -> bool:
     )
 
 
+def _independence_key(item: Evidence) -> str:
+    if item.independence_group is not None:
+        return f"group:{item.independence_group.strip()}"
+    if item.source_ref is not None:
+        return f"ref:{item.source_ref.strip()}"
+    return f"source:{item.source_id.strip()}"
+
+
 def _independent_supporting_source_count(eligible: Sequence[Evidence]) -> int:
     return len(
         {
-            item.source_id
+            _independence_key(item)
             for item in eligible
             if item.supports
             and item.directness is Directness.DIRECT
@@ -524,6 +535,7 @@ def _make_receipt(
                 else None
             ),
             "independent_supporting_source_count": _independent_supporting_source_count(eligible),
+            "independent_supporting_group_count": _independent_supporting_source_count(eligible),
             "medium_risk_required_sources": (
                 policy.medium_risk_min_independent_sources
                 if claim.risk is RiskLevel.MEDIUM
@@ -538,6 +550,7 @@ def _make_receipt(
                 "source_id": item.source_id,
                 "source_role": item.source_role.value,
                 "source_ref": item.source_ref,
+                "independence_group": item.independence_group,
                 "content_sha256": (
                     item.content_sha256.lower()
                     if item.content_sha256 is not None

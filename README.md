@@ -4,9 +4,9 @@ Deterministički evidence-first verifier za AI/agent tvrdnje.
 
 ## Trenutačni integracijski kandidat
 
-- **Core algoritam:** 2.1.0
+- **Core algoritam:** 2.1.1
 - **JSON adapter:** schema 3
-- **Paket:** 2.1.0
+- **Paket:** 2.1.1
 - **Guard Loop:** 2.0.0 kompatibilna jezgra, proširena strukturiranim unknown zapisima
 - **Integracijska grana:** `integration/bodulskihal-next-20261003`
 - **Lokalni integrirani testovi:** 208/208 PASS prije GitHub CI

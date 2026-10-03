@@ -122,6 +122,10 @@ def _evidence(raw: Any, path: str) -> Evidence:
             f"{path}.source_role",
         ),
         source_ref=_optional_string(obj.get("source_ref"), f"{path}.source_ref"),
+        independence_group=_optional_string(
+            obj.get("independence_group"),
+            f"{path}.independence_group",
+        ),
         content_sha256=_optional_string(
             obj.get("content_sha256"),
             f"{path}.content_sha256",

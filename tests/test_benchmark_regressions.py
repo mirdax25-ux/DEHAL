@@ -379,3 +379,38 @@ def test_memory_cannot_certify_external_fact():
     assert result.classification is Classification.UNKNOWN
     assert result.verdict is Verdict.BLOCK
     assert result.reason == "insufficient_authorized_evidence"
+
+
+def test_same_provenance_aliases_do_not_satisfy_independent_quorum():
+    common = dict(
+        supports=True,
+        observed_at=T0,
+        directness=Directness.DIRECT,
+        source_role=SourceRole.EXTERNAL,
+        source_ref="https://same.example/article",
+        content_sha256="a" * 64,
+        origin=EvidenceOrigin.EXTERNAL_SOURCE,
+        authority_scope=AuthorityScope.EXTERNAL_FACT,
+    )
+    result = verify_claim(
+        Claim(
+            "c-alias",
+            "Medium-risk fact",
+            ClaimType.OBSERVATION,
+            risk=RiskLevel.MEDIUM,
+        ),
+        [
+            Evidence(source_id="alias-a", evidence_id="alias-e1", **common),
+            Evidence(source_id="alias-b", evidence_id="alias-e2", **common),
+        ],
+        policy=Policy(
+            version="benchmark-v1",
+            max_age_seconds=300,
+            medium_risk_min_independent_sources=2,
+        ),
+        evaluation_time=T0,
+    )
+    assert result.classification is Classification.FACT
+    assert result.verdict is Verdict.ESCALATE
+    assert result.reason == "additional_independent_evidence_required"
+    assert result.receipt["gates"]["independent_supporting_source_count"] == 1
