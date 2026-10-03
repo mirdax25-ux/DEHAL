@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.3.1 — Strict Human-Approval Gate
+
+### Fixed
+- High-risk verification now rejects non-boolean `human_approved` values instead of accepting truthy objects or strings.
+- Compound verification no longer coerces approval values through `bool(...)`; each supplied approval must be an actual boolean.
+
+### Verification
+- TDD RED: PR CI run 36979300994 failed on Python 3.10, 3.11 and 3.13.
+- RED evidence: 2 failed / 66 passed because non-boolean approval inputs did not raise `TypeError`.
+- GREEN: PR CI run 36979396967 passed on Python 3.10, 3.11 and 3.13.
+- GREEN suite: 68/68 tests on Python 3.10.
+
+### Failure → Evolution
+
+#### BH-GATE-001 — Truthy non-boolean value could satisfy the human-approval gate
+- FAILURE MODE: values such as `"yes"`, `1`, or compound-map string `"false"` could be treated as approved because Python truthiness / `bool(...)` was accepted.
+- ROOT CAUSE: the core approval boundary relied on truthiness instead of exact boolean type validation.
+- GUARDRAIL: human approval is valid only when `type(value) is bool`; compound values are validated before verification and are no longer coerced.
+- REGRESSION TESTS: `test_high_risk_rejects_non_boolean_human_approval` and `test_compound_rejects_non_boolean_human_approval_values`.
+- VERSION CHANGE: package v1.3.0 → v1.3.1.
+
 ## v1.3.0 — Evaluation Harness / Grant Metrics candidate
 
 ### Added

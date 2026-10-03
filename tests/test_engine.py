@@ -357,3 +357,25 @@ def test_compound_rejects_duplicate_claim_ids():
 def test_empty_compound_does_not_vacuously_approve():
     with pytest.raises(ValueError, match="at least one claim"):
         verify_compound([], {}, policy=POLICY, evaluation_time=T0)
+
+
+def test_high_risk_rejects_non_boolean_human_approval():
+    with pytest.raises(TypeError, match="human_approved must be bool"):
+        verify_claim(
+            Claim("c1", "High-risk action ready", ClaimType.OBSERVATION, risk=RiskLevel.HIGH),
+            [ev("policy-check")],
+            policy=POLICY,
+            evaluation_time=T0,
+            human_approved="yes",  # type: ignore[arg-type]
+        )
+
+
+def test_compound_rejects_non_boolean_human_approval_values():
+    with pytest.raises(TypeError, match="human approval for c1 must be bool"):
+        verify_compound(
+            [Claim("c1", "High-risk action ready", ClaimType.OBSERVATION, risk=RiskLevel.HIGH)],
+            {"c1": [ev("policy-check")]},
+            policy=POLICY,
+            evaluation_time=T0,
+            human_approvals={"c1": "false"},  # type: ignore[dict-item]
+        )

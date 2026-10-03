@@ -106,6 +106,11 @@ def _effective_evidence_id(item: Evidence) -> str:
     return item.evidence_id or item.source_id
 
 
+def _validate_human_approval(value: bool, *, field_name: str = "human_approved") -> None:
+    if type(value) is not bool:
+        raise TypeError(f"{field_name} must be bool")
+
+
 def _validate_common_inputs(
     evidence: Sequence[Evidence], *, policy: Policy, evaluation_time: datetime
 ) -> None:
@@ -412,6 +417,7 @@ def verify_claim(
     evaluation_time: datetime,
     human_approved: bool = False,
 ) -> VerificationResult:
+    _validate_human_approval(human_approved)
     evidence_seq = tuple(evidence)
     _validate_evidence_identity(evidence_seq)
     _validate_common_inputs(evidence_seq, policy=policy, evaluation_time=evaluation_time)
@@ -466,13 +472,19 @@ def verify_compound(
         raise ValueError("duplicate claim_id")
 
     approvals = human_approvals or {}
+    for approval_claim_id, approval in approvals.items():
+        _validate_human_approval(
+            approval,
+            field_name=f"human approval for {approval_claim_id}",
+        )
+
     results = tuple(
         verify_claim(
             claim,
             evidence_by_claim.get(claim.claim_id, ()),
             policy=policy,
             evaluation_time=evaluation_time,
-            human_approved=bool(approvals.get(claim.claim_id, False)),
+            human_approved=approvals.get(claim.claim_id, False),
         )
         for claim in claims
     )
