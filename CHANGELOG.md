@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.1.1 ? Source-independence hardening
+
+### Fixed
+- Medium-risk quorum no longer treats two aliases of the same provenance reference as two independent sources.
+- Added optional `independence_group` to evidence. When present it is the primary independence identity; otherwise `source_ref`, then `source_id`, is used.
+- Verification receipts now report `independent_supporting_group_count` and preserve each evidence item's `independence_group`.
+
+### Failure ? Evolution
+- BH-INDEPENDENCE-002 ? different source IDs pointing to the same source reference could satisfy an independence quorum.
+- ROOT CAUSE: quorum counted caller-provided `source_id` values rather than provenance identity.
+- GUARDRAIL: independence quorum is computed from `independence_group`, falling back to `source_ref`, then `source_id`.
+- REGRESSION TESTS: aliased identical `source_ref` must remain one independent group; explicit same groups collapse; distinct groups can satisfy quorum.
+- VERSION CHANGE: algorithm/package 2.1.0 ? 2.1.1.
+
 ## v2.1.0 ? Integrated deterministic verification candidate
 
 ### Integrated

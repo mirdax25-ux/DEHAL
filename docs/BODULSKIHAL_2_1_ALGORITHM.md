@@ -102,7 +102,7 @@ ACTION_STATE zahtijeva:
 
 ### C7. Source-independence gate
 
-Quorum se računa po jedinstvenom source_id / independence identitetu, ne po broju evidence objekata. Dvije observacije istog izvora nisu dva neovisna izvora.
+Quorum se ra?una po jedinstvenom identitetu neovisnosti, ne po broju evidence objekata. Redoslijed je: eksplicitni `independence_group`, zatim `source_ref`, pa `source_id`. Dva aliasa istog izvora ili dvije observacije iste grupe nisu dva neovisna izvora.
 
 ### C8. Unknown gate
 
@@ -160,6 +160,7 @@ Novi release ne smije izgubiti prethodni prolaz bez eksplicitnog objašnjenja.
 - BH-CONSTRAINT-001 — aktivni hrvatski/latinica constraint mora biti zadovoljen.
 - BH-PROVENANCE-001 — release policy može zahtijevati dokazivi source/build identitet.
 - BH-SOURCE-INDEPENDENCE-001 — dvije evidence instance istog source_id ne zadovoljavaju quorum.
+- BH-INDEPENDENCE-002 ? razli?iti source_id aliasi istog source_ref / independence_group ne zadovoljavaju quorum.
 
 ## Kompatibilnost
 

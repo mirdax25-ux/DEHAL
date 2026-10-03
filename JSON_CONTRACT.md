@@ -25,6 +25,8 @@ Schema v3 keeps the deterministic JSON adapter boundary and adds epistemic metad
       "post_action": false,
       "eligible": true,
       "source_role": "external",
+      "source_ref": "tool://conversation-counter",
+      "independence_group": "conversation-counter",
       "origin": "tool_observation",
       "authority_scope": "external_fact"
     }
@@ -49,6 +51,13 @@ New claim fields are optional in the Python adapter and default fail-safely to:
 New evidence fields are optional and default to:
 - `origin = external_source`
 - `authority_scope = external_fact`
+- `independence_group = null`
+
+For source-independence quorum, identity is resolved deterministically in this order:
+1. explicit `independence_group`,
+2. `source_ref`,
+3. `source_id`.
+Aliases of the same provenance reference therefore do not count as independent sources.
 
 ## Classification
 
