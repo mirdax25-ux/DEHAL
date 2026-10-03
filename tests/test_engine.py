@@ -251,7 +251,7 @@ def test_receipt_records_algorithm_and_policy_versions():
         policy=POLICY,
         evaluation_time=T0,
     )
-    assert result.receipt["algorithm_version"] == "1.0.0"
+    assert result.receipt["algorithm_version"] == "2.1.0"
     assert result.receipt["policy_version"] == "1.0"
 
 
@@ -264,8 +264,9 @@ def test_blocked_claim_emits_failure_evolution_record():
     )
     assert result.failure_record is not None
     assert result.failure_record["failure_mode"] == "insufficient_eligible_evidence"
-    assert result.failure_record["regression_test_required"] is True
-    assert result.failure_record["version_change_required"] is True
+    assert result.failure_record["record_type"] == "expected_gate"
+    assert result.failure_record["regression_test_required"] is False
+    assert result.failure_record["version_change_required"] is False
 
 
 def test_approved_claim_has_no_failure_evolution_record():
@@ -356,3 +357,119 @@ def test_compound_rejects_duplicate_claim_ids():
 def test_empty_compound_does_not_vacuously_approve():
     with pytest.raises(ValueError, match="at least one claim"):
         verify_compound([], {}, policy=POLICY, evaluation_time=T0)
+
+
+def test_high_risk_rejects_non_boolean_human_approval():
+    with pytest.raises(TypeError, match="human_approved must be bool"):
+        verify_claim(
+            Claim("c1", "High-risk action ready", ClaimType.OBSERVATION, risk=RiskLevel.HIGH),
+            [ev("policy-check")],
+            policy=POLICY,
+            evaluation_time=T0,
+            human_approved="yes",  # type: ignore[arg-type]
+        )
+
+
+def test_compound_rejects_non_boolean_human_approval_values():
+    with pytest.raises(TypeError, match="human approval for c1 must be bool"):
+        verify_compound(
+            [Claim("c1", "High-risk action ready", ClaimType.OBSERVATION, risk=RiskLevel.HIGH)],
+            {"c1": [ev("policy-check")]},
+            policy=POLICY,
+            evaluation_time=T0,
+            human_approvals={"c1": "false"},  # type: ignore[dict-item]
+        )
+
+
+@pytest.mark.parametrize("bad_id", ["", "   "])
+def test_core_rejects_blank_claim_id(bad_id):
+    with pytest.raises(ValueError, match="claim_id must be non-empty string"):
+        verify_claim(
+            Claim(bad_id, "File exists", ClaimType.OBSERVATION),
+            [ev("filesystem")],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+@pytest.mark.parametrize("bad_text", ["", "   "])
+def test_core_rejects_blank_claim_text(bad_text):
+    with pytest.raises(ValueError, match="claim.text must be non-empty string"):
+        verify_claim(
+            Claim("c1", bad_text, ClaimType.OBSERVATION),
+            [ev("filesystem")],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+@pytest.mark.parametrize("bad_source_id", ["", "   "])
+def test_core_rejects_blank_evidence_source_id(bad_source_id):
+    with pytest.raises(ValueError, match="evidence.source_id must be non-empty string"):
+        verify_claim(
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [ev(bad_source_id)],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+@pytest.mark.parametrize("bad_version", ["", "   "])
+def test_core_rejects_blank_policy_version(bad_version):
+    with pytest.raises(ValueError, match="policy.version must be non-empty string"):
+        verify_claim(
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [ev("filesystem")],
+            policy=Policy(version=bad_version, max_age_seconds=300),
+            evaluation_time=T0,
+        )
+
+
+def test_core_rejects_non_boolean_evidence_supports():
+    malformed = Evidence(
+        source_id="bad-supports",
+        supports="false",  # type: ignore[arg-type]
+        observed_at=T0,
+        directness=Directness.DIRECT,
+    )
+    with pytest.raises(TypeError, match="evidence.supports must be bool"):
+        verify_claim(
+            Claim("c1", "Service healthy", ClaimType.OBSERVATION),
+            [malformed],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+def test_core_rejects_non_boolean_post_action_instead_of_approving_completion():
+    malformed = Evidence(
+        source_id="bad-post-action",
+        supports=True,
+        observed_at=T0,
+        directness=Directness.DIRECT,
+        post_action="false",  # type: ignore[arg-type]
+    )
+    with pytest.raises(TypeError, match="evidence.post_action must be bool"):
+        verify_claim(
+            Claim("c1", "Email sent", ClaimType.ACTION_STATE),
+            [malformed],
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
+def test_core_rejects_non_boolean_evidence_eligible():
+    malformed = Evidence(
+        source_id="bad-eligible",
+        supports=True,
+        observed_at=T0,
+        directness=Directness.DIRECT,
+        eligible="false",  # type: ignore[arg-type]
+    )
+    with pytest.raises(TypeError, match="evidence.eligible must be bool"):
+        verify_claim(
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [malformed],
+            policy=POLICY,
+            evaluation_time=T0,
+        )

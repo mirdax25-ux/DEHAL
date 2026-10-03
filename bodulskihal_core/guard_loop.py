@@ -30,6 +30,23 @@ class GuardStage(str, Enum):
     VERIFICATION = "verification"
 
 
+class UnknownSeverity(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+@dataclass(frozen=True)
+class UnknownRecord:
+    description: str
+    severity: UnknownSeverity = UnknownSeverity.MEDIUM
+    reviewed: bool = False
+    resolved: bool = False
+    blocking: bool = False
+    resolution_reference: str | None = None
+
+
 @dataclass(frozen=True)
 class SelfCheck:
     realism: Realism
@@ -38,6 +55,7 @@ class SelfCheck:
     unknowns: tuple[str, ...]
     assumptions_reviewed: bool
     unknowns_reviewed: bool
+    unknown_records: tuple[UnknownRecord, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -70,6 +88,32 @@ def _validate_self_check(check: SelfCheck) -> None:
         if any(not isinstance(item, str) or not item.strip() for item in values):
             raise ValueError(f"{field_name} items must be non-empty strings")
 
+    if not isinstance(check.unknown_records, tuple):
+        raise TypeError("unknown_records must be tuple")
+    for item in check.unknown_records:
+        if not isinstance(item, UnknownRecord):
+            raise TypeError("unknown_records must contain UnknownRecord values")
+        if not isinstance(item.description, str) or not item.description.strip():
+            raise ValueError("unknown record description must be non-empty")
+        if not isinstance(item.severity, UnknownSeverity):
+            raise TypeError("unknown record severity must be UnknownSeverity")
+        if type(item.reviewed) is not bool:
+            raise TypeError("unknown record reviewed must be bool")
+        if type(item.resolved) is not bool:
+            raise TypeError("unknown record resolved must be bool")
+        if type(item.blocking) is not bool:
+            raise TypeError("unknown record blocking must be bool")
+        if item.resolution_reference is not None and (
+            not isinstance(item.resolution_reference, str)
+            or not item.resolution_reference.strip()
+        ):
+            raise ValueError("resolution_reference must be non-empty when supplied")
+        if item.resolved and (item.blocking or item.severity is UnknownSeverity.CRITICAL):
+            if item.resolution_reference is None:
+                raise ValueError(
+                    "resolved blocking or critical unknown requires resolution_reference"
+                )
+
 
 def _self_check_payload(check: SelfCheck) -> dict:
     return {
@@ -79,6 +123,17 @@ def _self_check_payload(check: SelfCheck) -> dict:
         "unknowns": list(check.unknowns),
         "assumptions_reviewed": check.assumptions_reviewed,
         "unknowns_reviewed": check.unknowns_reviewed,
+        "unknown_records": [
+            {
+                "description": item.description,
+                "severity": item.severity.value,
+                "reviewed": item.reviewed,
+                "resolved": item.resolved,
+                "blocking": item.blocking,
+                "resolution_reference": item.resolution_reference,
+            }
+            for item in check.unknown_records
+        ],
     }
 
 
@@ -134,6 +189,20 @@ def run_guard_loop(
             check=self_check,
             verdict=Verdict.ESCALATE,
             reason="self_check_uncertain",
+        )
+
+    unresolved_blocking = tuple(
+        item
+        for item in self_check.unknown_records
+        if not item.resolved
+        and (item.blocking or item.severity is UnknownSeverity.CRITICAL)
+    )
+    if unresolved_blocking:
+        return _self_check_result(
+            claim=claim,
+            check=self_check,
+            verdict=Verdict.ESCALATE,
+            reason="blocking_unknown_unresolved",
         )
 
     if not self_check.assumptions_reviewed:

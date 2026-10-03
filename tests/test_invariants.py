@@ -79,9 +79,14 @@ def test_exhaustive_boolean_core_invariants_128_cases():
             assert result_no_human.classification is Classification.UNKNOWN
             assert result_no_human.verdict is Verdict.BLOCK
 
-        # I3/I4: any eligible contradiction dominates into CONFLICT and cannot approve.
+        # I3/I4: mixed support/counterevidence is CONFLICT; pure counterevidence is REFUTED.
         if contradiction:
-            assert result_no_human.classification is Classification.CONFLICT
+            expected = (
+                Classification.CONFLICT
+                if has_evidence
+                else Classification.REFUTED
+            )
+            assert result_no_human.classification is expected
             assert result_no_human.verdict is Verdict.BLOCK
             assert result_human.verdict is Verdict.BLOCK
 

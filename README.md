@@ -1,123 +1,126 @@
 # BodulskiHal
 
-Evidence-first verification for AI/agent claims.
+Deterministički evidence-first verifier za AI/agent tvrdnje.
 
-## Versions
+## Trenutačni integracijski kandidat
 
-- **Core algorithm:** v1.0.0
-- **JSON transport adapter:** schema v1
-- **Package:** v1.3.0
-- **Research-Agent Evidence Demo:** v1.2
-- **Evaluation Harness / Grant Metrics:** v1.3
+- **Core algoritam:** 2.1.0
+- **JSON adapter:** schema 3
+- **Paket:** 2.1.0
+- **Guard Loop:** 2.0.0 kompatibilna jezgra, proširena strukturiranim unknown zapisima
+- **Integracijska grana:** `integration/bodulskihal-next-20261003`
+- **Lokalni integrirani testovi:** 208/208 PASS prije GitHub CI
 
-## Core rule
+Ovo nije još release tvrdnja. GitHub CI, neovisni pregled, post-action provjera i eventualni live rollout ostaju zasebni gateovi.
 
-`CONFIDENCE <= EVIDENCE`
+## Arhitektonsko pravilo
 
-Atomic claims are classified as:
+**DETERMINISTIČKI ULAZ → NEDETERMINISTIČKA PRIPREMA → DETERMINISTIČKA PROVJERA → RECEIPT**
+
+Nedeterministička priprema može koristiti BodulLogic, PRECICU, modele, memoriju i alate. Ona stvara kandidatni strukturirani ugovor, ne konačnu istinu. BodulskiHal daje završnu klasifikaciju samo iz strukturiranih ulaza i dokaznih pravila.
+
+Detaljna specifikacija: `docs/BODULSKIHAL_2_1_ALGORITHM.md`.
+
+## Klasifikacije
 
 - `FACT`
 - `INFERENCE`
 - `ESTIMATE`
 - `UNKNOWN`
+- `REFUTED`
 - `CONFLICT`
 
-Verdicts are:
+Verdicti:
 
 - `APPROVE`
 - `BLOCK`
 - `ESCALATE`
 
-## Hard gates
+## Najvažniji hard gateovi
 
-1. Missing eligible evidence cannot become `FACT`.
-2. Eligible contradiction yields `CONFLICT`.
-3. `INFERENCE` and `ESTIMATE` do not masquerade as `FACT`.
-4. Action completion requires fresh, direct post-action/final-state evidence.
-5. High-risk claims require human approval before `APPROVE`.
-6. Compound verification requires every consequential clause to pass.
-7. Duplicate evidence/claim identities are rejected.
-8. Naive timestamps, invalid freshness windows and empty compounds fail closed.
+1. Nedostatak prihvatljivog dokaza ne može postati FACT.
+2. Čisti prihvatljivi counterevidence daje REFUTED.
+3. Istodobna podrška i counterevidence daju CONFLICT.
+4. INFERENCE i ESTIMATE ne glume FACT.
+5. ACTION_STATE zahtijeva svjež direktan post-action dokaz; policy može zahtijevati neovisni verifier/external izvor.
+6. USER_ASSERTION ne može sam certificirati EXTERNAL_FACT.
+7. USER_PREFERENCE / USER_INSTRUCTION vrijede samo unutar pripadajućeg authority scopea.
+8. Critical ili blocking unknown koji nije resolved ne prolazi samo zato što je reviewed.
+9. Conversation contract provjerava goal, referent i aktivne constraints.
+10. High-risk remote human approval ostaje fail-closed dok odobrenje nije autentificirano.
+11. Duplicate claim/evidence identiteti i nevaljani runtime tipovi fail-close.
+12. Policy može zahtijevati dokazivi runtime source commit/ref/build id.
 
-## JSON adapter
+## Porijeklo i autoritet dokaza
 
-Use `verify_payload(...)` and `verify_compound_payload(...)`.
+Evidence nosi odvojeno:
 
-The adapter validates supplied JSON-shaped evidence and delegates verdict logic to the core. It does not fetch or authenticate arbitrary external sources.
+- `origin`: external source, tool observation, computed result, memory, user assertion, user self-report, user preference ili user instruction
+- `authority_scope`: external fact, system state, user self-report, user preference ili user instruction
 
-## Research-Agent Evidence Demo
+Porijeklo nije isto što i istinitost. Autoritet se procjenjuje deterministički prema vrsti tvrdnje.
 
-Run:
+## Answerability
 
-```bash
-python examples/research_demo.py
-```
+Claim može biti:
 
-The bundled deterministic fixture demonstrates:
+- ANSWERABLE
+- PARTIALLY_ANSWERABLE
+- UNDERSPECIFIED
+- FALSE_PREMISE
+- CONTRADICTORY_INPUT
+- NEEDS_CLARIFICATION
+- OUT_OF_SCOPE
 
-- supported → `FACT / APPROVE`
-- missing evidence → `UNKNOWN / BLOCK`
-- contradiction → `CONFLICT / BLOCK`
-- action without final-state proof → `FACT / BLOCK`
-- high-risk fact without human approval → `FACT / ESCALATE`
+Nedovoljno definiran input ne smije se pretvoriti u izmišljeni odgovor.
 
-See `RESEARCH_DEMO.md`.
+## Conversation contract
 
-## Evaluation Harness
+`conversation_gate.py` provjerava:
 
-Run:
+- aktivni cilj,
+- aktivni referent,
+- kandidatni cilj/referent,
+- aktivna strukturirana ograničenja.
 
-```bash
-python examples/evaluation_demo.py
-```
+To je deterministic output gate. Semantičko određivanje referenta/cilja ostaje u upstream pripremi, npr. BodulLogicu.
 
-The v1.3 benchmark reports directly measurable system metrics:
+## Runtime provenance
 
-- automatic disposition rate
-- human-attention queue/rate
-- evidence coverage
-- unsupported-claim block rate
-- contradiction detection rate
-- action-completion false-positive rate
-- high-risk-without-human-approval approve rate
+Svaki receipt uključuje runtime provenance:
 
-The bundled five-claim reference benchmark currently yields:
+- `BODULSKIHAL_SOURCE_COMMIT`
+- `BODULSKIHAL_SOURCE_REF`
+- `BODULSKIHAL_BUILD_ID`
 
-- automatic disposition rate: **0.6**
-- human-attention rate: **0.4**
-- evidence coverage: **0.8**
-- unsupported-claim block rate: **1.0**
-- contradiction detection rate: **1.0**
-- action-completion false-positive rate: **0.0**
-- high-risk-without-human-approval approve rate: **0.0**
+Ako policy postavi `require_runtime_provenance=true`, neidentificirani build se blokira.
 
-These are results on a tiny deterministic reference fixture, not general performance claims.
+GitHub CI automatski postavlja ova polja iz GitHub run konteksta.
 
-No timed human-effort study has yet been performed.
+## Floot rc.3 audit snapshot
 
-See `EVALUATION_HARNESS.md`.
+`remote/floot_rc3/` sadrži kopiju izvornog sourcea trenutačnog Floot rc.3 servisa i SHA-256 manifest.
 
-## Tests
+Taj snapshot potvrđuje koji je source opažen u Floot projektu/versionu, ali ne izmišlja retroaktivnu Git commit vezu koja tada nije postojala.
+
+## Testovi
 
 ```bash
 python -m pytest
 ```
 
-The v1.3 candidate contains 53 tests before final packaging/doc CI.
+Benchmark regresije su u:
 
-## Determinism boundary
+`tests/test_benchmark_regressions.py`
 
-Receipt determinism requires the same normalized inputs, policy version and explicit `evaluation_time`. Freshness is time-dependent.
+i pokrivaju REFUTED, user-anchor authority, source independence, structured unknowns, referent/constraint gate i runtime provenance.
 
-## Status boundary
+## Granica tvrdnji
 
-This repository verifies a bounded reference implementation, deterministic research fixture and benchmark harness.
+Ovaj projekt ne tvrdi da:
 
-It does **not** prove:
-
-- all hallucinations can be detected,
-- supplied external evidence is authentic,
-- benchmark rates generalize beyond the defined fixture,
-- actual human reviewer time savings,
-- the complete BodulAI ecosystem is production ready,
-- arbitrary live research workflows are already verified end-to-end.
+- otkriva sve halucinacije,
+- supplied evidence automatski znači autentičan vanjski izvor,
+- jedan benchmark generalizira na sve modele,
+- Logic/Hal uzrokuju poboljšanje bez kontroliranog A/B testa,
+- cijeli BodulAI sustav jest production-ready samo zato što core testovi prolaze.
