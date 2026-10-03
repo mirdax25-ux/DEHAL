@@ -50,6 +50,14 @@ __all__ = [
     "freeze_project",
     "authorize_mutation",
     "reopen_project",
+    "SpeakerRole",
+    "AtomStatus",
+    "RawResponseEnvelope",
+    "ClaimAtom",
+    "EvidenceContract",
+    "bind_atom",
+    "atomize_raw_response",
+    "build_evidence_contract",
 ]
 
 from .adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
@@ -71,4 +79,15 @@ from .lifecycle import (
     authorize_mutation,
     freeze_project,
     reopen_project,
+)
+
+from .raw_pipeline import (
+    AtomStatus,
+    ClaimAtom,
+    EvidenceContract,
+    RawResponseEnvelope,
+    SpeakerRole,
+    atomize_raw_response,
+    bind_atom,
+    build_evidence_contract,
 )
