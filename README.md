@@ -4,12 +4,12 @@ Deterministički evidence-first verifier za AI/agent tvrdnje.
 
 ## Trenutačni integracijski kandidat
 
-- **Core algoritam:** 2.1.1
+- **Core algoritam:** 2.1.2
 - **JSON adapter:** schema 3
-- **Paket:** 2.1.1
+- **Paket:** 2.1.2
 - **Guard Loop:** 2.0.0 kompatibilna jezgra, proširena strukturiranim unknown zapisima
-- **Integracijska grana:** `integration/bodulskihal-next-20261003`
-- **Lokalni integrirani testovi:** 208/208 PASS prije GitHub CI
+- **Integracijska grana:** `integration/bodulskihal-benchmark-20261004`
+- **Provjera:** testovi i CI moraju odgovarati točnom commitu; povijesni broj testova nije status trenutačne verzije.
 
 Ovo nije još release tvrdnja. GitHub CI, neovisni pregled, post-action provjera i eventualni live rollout ostaju zasebni gateovi.
 
@@ -50,6 +50,8 @@ Verdicti:
 10. High-risk remote human approval ostaje fail-closed dok odobrenje nije autentificirano.
 11. Duplicate claim/evidence identiteti i nevaljani runtime tipovi fail-close.
 12. Policy može zahtijevati dokazivi runtime source commit/ref/build id.
+13. Ingestion authority mora biti `TypeAuthority`; lifecycle approval/checkpoint flagovi moraju biti pravi booleans.
+14. Zajednički source ID, source ref ili independence group povezuju dokaze u jednu grupu; dodatni aliasi ne povećavaju quorum.
 
 ## Porijeklo i autoritet dokaza
 

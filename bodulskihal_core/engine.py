@@ -9,7 +9,7 @@ from typing import Iterable, Mapping, Sequence
 
 from .runtime_provenance import RuntimeProvenance, current_runtime_provenance
 
-ALGORITHM_VERSION = "2.1.1"
+ALGORITHM_VERSION = "2.1.2"
 
 
 class ClaimType(str, Enum):
@@ -324,24 +324,37 @@ def _has_independent_post_action_evidence(eligible: Sequence[Evidence]) -> bool:
     )
 
 
-def _independence_key(item: Evidence) -> str:
-    if item.independence_group is not None:
-        return f"group:{item.independence_group.strip()}"
-    if item.source_ref is not None:
-        return f"ref:{item.source_ref.strip()}"
-    return f"source:{item.source_id.strip()}"
-
-
 def _independent_supporting_source_count(eligible: Sequence[Evidence]) -> int:
-    return len(
-        {
-            _independence_key(item)
-            for item in eligible
-            if item.supports
+    # Extra metadata may join known identities, never split the same provenance.
+    # Connected components preserve overlap transitively, regardless of input order.
+    parents: list[int] = []
+    seen: dict[tuple[str, str], int] = {}
+
+    def root(index: int) -> int:
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    for item in eligible:
+        if not (
+            item.supports
             and item.directness is Directness.DIRECT
             and item.source_role in {SourceRole.VERIFIER, SourceRole.EXTERNAL}
-        }
-    )
+        ):
+            continue
+        index = len(parents)
+        parents.append(index)
+        identities = [("source", item.source_id.strip())]
+        if item.source_ref is not None:
+            identities.append(("ref", item.source_ref.strip()))
+        if item.independence_group is not None:
+            identities.append(("group", item.independence_group.strip()))
+        for identity in identities:
+            previous = seen.setdefault(identity, index)
+            parents[root(index)] = root(previous)
+
+    return len({root(index) for index in range(len(parents))})
 
 
 def _decide_verdict(

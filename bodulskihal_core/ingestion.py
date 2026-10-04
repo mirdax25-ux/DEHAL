@@ -104,6 +104,8 @@ def type_clause(
     *,
     authority: TypeAuthority = TypeAuthority.EXECUTOR,
 ) -> ClaimType:
+    if not isinstance(authority, TypeAuthority):
+        raise TypeError("authority must be TypeAuthority")
     if not isinstance(text, str) or not text.strip():
         raise ValueError("clause text must be non-empty")
 
@@ -304,6 +306,7 @@ _ALLOWED_EVIDENCE_KEYS = {
     "evidence_id",
     "source_role",
     "source_ref",
+    "independence_group",
     "content_sha256",
     "origin",
     "authority_scope",
@@ -463,6 +466,10 @@ def collect_normalize_evidence(
                     source_ref=_record_optional_string(
                         obj.get("source_ref"),
                         f"{path}.source_ref",
+                    ),
+                    independence_group=_record_optional_string(
+                        obj.get("independence_group"),
+                        f"{path}.independence_group",
                     ),
                     content_sha256=_record_optional_string(
                         obj.get("content_sha256"),

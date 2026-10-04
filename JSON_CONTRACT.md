@@ -53,11 +53,18 @@ New evidence fields are optional and default to:
 - `authority_scope = external_fact`
 - `independence_group = null`
 
-For source-independence quorum, identity is resolved deterministically in this order:
-1. explicit `independence_group`,
-2. `source_ref`,
-3. `source_id`.
-Aliases of the same provenance reference therefore do not count as independent sources.
+For source-independence quorum, eligible direct supporting evidence is grouped by
+shared `source_id`, `source_ref`, or `independence_group`, including transitive
+overlap. Values are trimmed and compared within their own field namespace.
+Optional metadata can merge identities; it cannot split a known source into
+independent votes. Different group labels on the same provenance reference still
+count as one group. No URL canonicalization or external source authentication is
+implied by this deterministic comparison.
+
+The ingestion evidence boundary accepts the same optional `independence_group`
+field. The Python ingestion API requires a real `TypeAuthority` enum member;
+strings and other runtime values are rejected before claim typing. Lifecycle
+checkpoint/approval flags likewise require actual booleans.
 
 ## Classification
 

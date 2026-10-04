@@ -139,12 +139,12 @@ def test_demo_preserves_versioned_receipts():
     result = run_research_demo(fixture())
 
     assert result["schema_version"] == 3
-    assert result["algorithm_version"] == "2.1.1"
+    assert result["algorithm_version"] == "2.1.2"
     assert result["policy_version"] == "1.0"
 
     for item in result["results"]:
         receipt = item["receipt"]
-        assert receipt["algorithm_version"] == "2.1.1"
+        assert receipt["algorithm_version"] == "2.1.2"
         assert receipt["policy_version"] == "1.0"
 
 
