@@ -10,11 +10,11 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
-Current experiment version: **0.1.1**
+Current experiment version: **0.1.2**
 
 Preparation environment:
 - python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
-  - **418 passed** = 96 targeted/regression + 322 deterministic fuzz/property
+  - **424 passed** = 102 targeted/regression + 322 deterministic fuzz/property
 - python -m compileall -q experiments/grouped_n1n2_c_s1_s2
   - exit code 0
 
@@ -43,6 +43,10 @@ S1 initially treated a stale global anchor as an integrity failure and returned 
 ## Confirmed second failure fixed
 
 The initial fuzz-expanded attack found that loop CONFLICT/UNKNOWN and final N2 CHALLENGE/UNKNOWN could be recorded in C but silently disappear before S2, producing PASS. Version 0.1.1 makes both loop status and final-N2 status inputs to S2's terminal lattice. Regression tests cover all four reproduced paths.
+
+## Confirmed third failure fixed
+
+A caller could previously fabricate a plain loop_result with PASS and skip N1<->N2 entirely. Version 0.1.2 introduces an authoritative loop receipt bound to transition, candidate, loop status and receipt-chain root. final N2, C and S1 verify this provenance chain. Six new regression cases cover the reproduced bypass and tampering variants.
 
 ## Next attacks
 

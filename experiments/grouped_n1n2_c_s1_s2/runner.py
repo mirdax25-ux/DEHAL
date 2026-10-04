@@ -18,7 +18,7 @@ import math
 import re
 from typing import Any
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -276,24 +276,69 @@ def n1_n2_loop(
             break
         seen.add(d)
         candidate = revised
+    loop_root = digest([digest(r) for r in receipts])
+    loop_receipt = boundary.issue(
+        issuer="LOOP",
+        kind="result",
+        payload={
+            "transition_hash": digest(transition_receipt),
+            "candidate_hash": digest(candidate),
+            "loop_status": loop_status,
+            "loop_root": loop_root,
+            "receipt_count": len(receipts),
+        },
+    )
     return {
         "candidate": candidate,
         "receipts": receipts,
         "loop_status": loop_status,
-        "loop_root": digest([digest(r) for r in receipts]),
+        "loop_root": loop_root,
+        "loop_receipt": loop_receipt,
     }
 
 
-def final_n2(boundary: TrustedBoundary, *, loop_result: dict[str, Any], review: dict[str, Any], transition_receipt: dict[str, Any]) -> dict[str, Any]:
-    _strict_keys(loop_result, ("candidate", "receipts", "loop_status", "loop_root"))
+def _verify_loop_result(
+    boundary: TrustedBoundary,
+    *,
+    loop_result: dict[str, Any],
+    transition_receipt: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    _strict_keys(loop_result, ("candidate", "receipts", "loop_status", "loop_root", "loop_receipt"))
     transition = boundary.verify(transition_receipt, issuer="S-boundary", kind="transition")
+    receipt = boundary.verify(loop_result["loop_receipt"], issuer="LOOP", kind="result")
     candidate = deepcopy(loop_result["candidate"])
     validate_candidate(candidate)
+    if loop_result["loop_status"] not in ("PASS", "UNKNOWN", "CONFLICT"):
+        raise ProtocolError("invalid_loop_status")
+    recomputed_root = digest([digest(item) for item in loop_result["receipts"]])
+    checks = (
+        receipt["transition_hash"] == digest(transition_receipt),
+        receipt["candidate_hash"] == digest(candidate),
+        receipt["loop_status"] == loop_result["loop_status"],
+        receipt["loop_root"] == loop_result["loop_root"] == recomputed_root,
+        receipt["receipt_count"] == len(loop_result["receipts"]),
+        candidate["goal_id"] == transition["goal_id"],
+        candidate["state_version"] == transition["state_version"],
+    )
+    if not all(checks):
+        raise ProtocolError("loop_receipt_mismatch")
+    return transition, receipt
+
+
+def final_n2(boundary: TrustedBoundary, *, loop_result: dict[str, Any], review: dict[str, Any], transition_receipt: dict[str, Any]) -> dict[str, Any]:
+    transition, loop_receipt = _verify_loop_result(
+        boundary, loop_result=loop_result, transition_receipt=transition_receipt
+    )
+    candidate = deepcopy(loop_result["candidate"])
     validate_n2_review(review)
-    parent = loop_result["loop_root"]
+    parent = digest(loop_result["loop_receipt"])
     receipt = seal_n2_review(boundary, candidate=candidate, review=review, parent_hash=parent)
     payload = boundary.verify(receipt, issuer="N2", kind="review")
-    if payload["candidate_hash"] != digest(candidate) or candidate["goal_id"] != transition["goal_id"]:
+    if (
+        payload["candidate_hash"] != digest(candidate)
+        or payload["parent_hash"] != digest(loop_result["loop_receipt"])
+        or candidate["goal_id"] != transition["goal_id"]
+    ):
         raise ProtocolError("final_n2_binding_mismatch")
     return receipt
 
@@ -305,12 +350,16 @@ def make_checkpoint(
     loop_result: dict[str, Any],
     final_n2_receipt: dict[str, Any],
 ) -> dict[str, Any]:
-    transition = boundary.verify(transition_receipt, issuer="S-boundary", kind="transition")
+    transition, loop_receipt = _verify_loop_result(
+        boundary, loop_result=loop_result, transition_receipt=transition_receipt
+    )
     candidate = deepcopy(loop_result["candidate"])
-    validate_candidate(candidate)
     n2 = boundary.verify(final_n2_receipt, issuer="N2", kind="review")
-    if n2["candidate_hash"] != digest(candidate):
-        raise ProtocolError("final_review_wrong_candidate")
+    if (
+        n2["candidate_hash"] != digest(candidate)
+        or n2["parent_hash"] != digest(loop_result["loop_receipt"])
+    ):
+        raise ProtocolError("final_review_wrong_candidate_or_loop")
     payload = {
         "transition_hash": digest(transition_receipt),
         "goal_id": transition["goal_id"],
@@ -322,6 +371,8 @@ def make_checkpoint(
         "candidate_hash": digest(candidate),
         "loop_status": loop_result["loop_status"],
         "loop_root": loop_result["loop_root"],
+        "loop_receipt": deepcopy(loop_result["loop_receipt"]),
+        "loop_receipt_hash": digest(loop_result["loop_receipt"]),
         "final_n2_receipt_hash": digest(final_n2_receipt),
         "final_n2_decision": n2["decision"],
         "final_n2_issues": list(n2["issues"]),
@@ -343,6 +394,7 @@ def s1_verify(
         cp = boundary.verify(checkpoint, issuer="C", kind="checkpoint")
         tr = boundary.verify(transition_receipt, issuer="S-boundary", kind="transition")
         n2 = boundary.verify(final_n2_receipt, issuer="N2", kind="review")
+        loop_receipt = boundary.verify(cp["loop_receipt"], issuer="LOOP", kind="result")
         validate_state(current_state)
         validate_policy(policy)
         validate_candidate(cp["candidate"])
@@ -353,6 +405,14 @@ def s1_verify(
             "state_hash": cp["state_hash"] == digest(current_state) == tr["state_hash"],
             "state_version": cp["state_version"] == current_state["version"] == tr["state_version"] == cp["candidate"]["state_version"],
             "candidate_hash": cp["candidate_hash"] == digest(cp["candidate"]) == n2["candidate_hash"],
+            "loop_receipt": (
+                cp["loop_receipt_hash"] == digest(cp["loop_receipt"])
+                and loop_receipt["transition_hash"] == cp["transition_hash"]
+                and loop_receipt["candidate_hash"] == cp["candidate_hash"]
+                and loop_receipt["loop_status"] == cp["loop_status"]
+                and loop_receipt["loop_root"] == cp["loop_root"]
+                and n2["parent_hash"] == digest(cp["loop_receipt"])
+            ),
             "n2_receipt": cp["final_n2_receipt_hash"] == digest(final_n2_receipt),
         }
         status = "PASS" if all(checks.values()) else "BLOCK"

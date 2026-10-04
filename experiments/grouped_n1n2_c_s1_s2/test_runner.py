@@ -429,3 +429,45 @@ def test_canonical_is_stable_for_object_key_order():
 
 def test_bool_and_int_hash_differ():
     assert digest({"x":True}) != digest({"x":1})
+
+
+def test_caller_cannot_bypass_loop_with_plain_forged_result():
+    boundary, f = fx()
+    forged = {
+        "candidate": deepcopy(f["initial"]),
+        "receipts": [],
+        "loop_status": "PASS",
+        "loop_root": "caller-forged-root",
+    }
+    with pytest.raises(ProtocolError):
+        final_n2(
+            boundary,
+            loop_result=forged,
+            review={"round_id":99,"decision":"CLEAR","issues":[]},
+            transition_receipt=f["transition"],
+        )
+
+
+@pytest.mark.parametrize("mutation", [
+    "status", "root", "candidate", "receipts", "loop_receipt_mac",
+])
+def test_loop_result_tamper_cannot_reach_final_n2(mutation):
+    boundary, f = fx()
+    loop = deepcopy(f["loop"])
+    if mutation == "status":
+        loop["loop_status"] = "UNKNOWN"
+    elif mutation == "root":
+        loop["loop_root"] = "tampered-root"
+    elif mutation == "candidate":
+        loop["candidate"]["action"]["amount"] += 1
+    elif mutation == "receipts":
+        loop["receipts"] = []
+    else:
+        loop["loop_receipt"]["mac"] = "0" * 64
+    with pytest.raises(ProtocolError):
+        final_n2(
+            boundary,
+            loop_result=loop,
+            review={"round_id":99,"decision":"CLEAR","issues":[]},
+            transition_receipt=f["transition"],
+        )

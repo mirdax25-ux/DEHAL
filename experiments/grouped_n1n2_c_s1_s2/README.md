@@ -43,7 +43,7 @@ python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/
 python -m compileall -q experiments/grouped_n1n2_c_s1_s2
 ```
 
-Experiment version **0.1.1** currently has **418 passing tests** in the local isolated environment: 96 targeted/regression tests plus 322 deterministic fuzz/property tests. Hosted GitHub CI and the repository's full existing suite are not claimed until separately observed.
+Experiment version **0.1.2** currently has **424 passing tests** in the local isolated environment: 102 targeted/regression tests plus 322 deterministic fuzz/property tests. Hosted GitHub CI and the repository's full existing suite are not claimed until separately observed.
 
 ## Explicit limitations
 

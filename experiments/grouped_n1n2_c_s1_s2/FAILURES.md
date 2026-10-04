@@ -24,6 +24,18 @@
 
 **Version change:** experiment 0.1.0 -> **0.1.1**.
 
+## F3 — caller could bypass the N1<->N2 loop with a forged plain loop_result
+
+**Failure mode:** A caller could skip `n1_n2_loop`, construct `{"loop_status":"PASS","loop_root":"caller-forged-root","receipts":[]}`, obtain a valid final-N2 receipt and C checkpoint, and reach S2 terminal PASS.
+
+**Root cause:** `final_n2` and `make_checkpoint` trusted plain caller-supplied loop fields. No trusted receipt bound the loop status, final candidate, transition and N2 receipt-chain root as one object.
+
+**Guardrail:** `n1_n2_loop` now emits a signed/bound `LOOP/result` receipt containing transition hash, candidate hash, loop status, loop root and receipt count. `final_n2` and C independently verify that receipt and recompute the receipt-list root. The final N2 receipt is parent-bound to the authoritative loop receipt. S1 verifies the loop receipt again inside C.
+
+**Regression test:** `test_caller_cannot_bypass_loop_with_plain_forged_result` plus `test_loop_result_tamper_cannot_reach_final_n2` cover missing receipt, forged status/root/candidate, removed review receipts and modified MAC.
+
+**Version change:** experiment 0.1.1 -> **0.1.2**.
+
 ## Known unresolved boundary — wrong specification
 
 A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact-action executor can still enforce a semantically wrong/incomplete policy if the trusted starting specification itself is wrong. This is not classified as fixed. The architecture must preserve bounded claims and use UNKNOWN when independent semantic grounding is unavailable.
