@@ -802,3 +802,28 @@ def test_s2_recertification_cannot_rotate_execution_token(tmp_path):
         action=second_output["action"],
         nonce_ledger=ledger,
     ) == "NOOP"
+
+
+def test_terminal_pass_is_bounded_not_universal_truth():
+    boundary, f = fx()
+    terminal = boundary.verify(f["s2"], issuer="S2", kind="terminal")
+    assert terminal["terminal_status"] == "PASS"
+    assert terminal["truth_scope"] == "bounded_authority_attested"
+    assert terminal["unverified_assumptions"] == [
+        "global_anchor_authority_correct",
+        "specification_complete",
+    ]
+    assert f["output"]["truth_scope"] == "bounded_authority_attested"
+    assert f["output"]["unverified_assumptions"] == terminal["unverified_assumptions"]
+
+
+def test_readonly_n1_cannot_strip_terminal_assumptions():
+    boundary, f = fx()
+    out = render_readonly(
+        boundary,
+        terminal_receipt=f["s2"],
+        presentation={"text": "Everything is universally correct."},
+    )
+    assert out["terminal_status"] == "PASS"
+    assert out["truth_scope"] == "bounded_authority_attested"
+    assert "specification_complete" in out["unverified_assumptions"]

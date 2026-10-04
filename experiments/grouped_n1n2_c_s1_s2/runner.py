@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -732,6 +732,8 @@ def s2_decide(
             "final_n2_status": final_n2_status,
             "contract_status": contract,
             "global_goal_status": global_status,
+            "truth_scope": "bounded_authority_attested",
+            "unverified_assumptions": ["global_anchor_authority_correct", "specification_complete"],
             "checkpoint_hash": digest(checkpoint),
             "state_hash": digest(current_state),
             "state_version": current_state["version"],
@@ -748,6 +750,8 @@ def s2_decide(
             "final_n2_status": "UNKNOWN",
             "contract_status": "BLOCK",
             "global_goal_status": "UNKNOWN",
+            "truth_scope": "bounded_authority_attested",
+            "unverified_assumptions": ["global_anchor_authority_correct", "specification_complete"],
             "checkpoint_hash": digest(checkpoint) if type(checkpoint) is dict else None,
             "state_hash": digest(current_state) if type(current_state) is dict else None,
             "state_version": current_state.get("version") if type(current_state) is dict else None,
@@ -766,6 +770,8 @@ def render_readonly(boundary: TrustedBoundary, *, terminal_receipt: dict[str, An
         raise ProtocolError("invalid_presentation")
     return {
         "terminal_status": terminal["terminal_status"],
+        "truth_scope": terminal["truth_scope"],
+        "unverified_assumptions": deepcopy(terminal["unverified_assumptions"]),
         "action": deepcopy(terminal["action"]),
         "action_hash": terminal["action_hash"],
         "state_version": terminal["state_version"],
@@ -784,13 +790,20 @@ def execute(
     nonce_ledger: FileNonceLedger,
 ) -> str:
     try:
-        _strict_keys(output, ("terminal_status", "action", "action_hash", "state_version", "terminal_receipt", "explanation"))
+        _strict_keys(output, ("terminal_status", "truth_scope", "unverified_assumptions", "action", "action_hash", "state_version", "terminal_receipt", "explanation"))
         terminal = boundary.verify(output["terminal_receipt"], issuer="S2", kind="terminal")
         validate_state(current_state)
         validate_policy(current_policy)
         if not isinstance(nonce_ledger, FileNonceLedger):
             return "BLOCK"
         if output["terminal_status"] != terminal["terminal_status"] or terminal["terminal_status"] != "PASS":
+            return "BLOCK"
+        if (
+            output["truth_scope"] != terminal["truth_scope"]
+            or terminal["truth_scope"] != "bounded_authority_attested"
+            or output["unverified_assumptions"] != terminal["unverified_assumptions"]
+            or terminal["unverified_assumptions"] != ["global_anchor_authority_correct", "specification_complete"]
+        ):
             return "BLOCK"
         if output["action_hash"] != terminal["action_hash"] or digest(action) != terminal["action_hash"]:
             return "BLOCK"
