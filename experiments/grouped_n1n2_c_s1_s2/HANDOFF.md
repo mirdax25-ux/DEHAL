@@ -20,12 +20,12 @@ Preparation environment:
 - multiprocess nonce race: 16 spawned processes attempted one token; exactly 1 consumed it and 15 were rejected
 
 Post-action verification of the actual GitHub branch:
-- fresh clone of experiment/grouped-n1n2-c-s1-s2-20261004 into a temporary Windows directory
+- fresh clone of attack/common-mode-spec-basis-20261004 into a temporary Windows directory
 - isolated .venv created because system Python did not have pytest
 - pytest on the checked-out experiment: **exit code 0**
 - compileall on the checked-out experiment: **exit code 0**
 
-The combined pre-existing repository tests plus this experiment were also run locally after the new race regression: **739 passed**. One immediately prior combined invocation produced a large transient failure set, but two fresh reruns of the same combined scope passed; the root cause of that transient is UNKNOWN, so it is recorded as a stability warning rather than silently discarded. Hosted GitHub Actions are not claimed here.
+The combined pre-existing repository tests plus this experiment were also run locally after the specification-scope hardening: **739 passed**. One immediately prior combined invocation produced a large transient failure set, but two fresh reruns of the same combined scope passed; the root cause of that transient is UNKNOWN, so it is recorded as a stability warning rather than silently discarded. Hosted GitHub Actions are not claimed here.
 
 ## Critical invariants
 
@@ -86,7 +86,7 @@ The local file ledger is at-most-once replay protection, not an exactly-once dis
 
 ## Next attacks
 
-- Common-mode specification errors across S1/S2.
+- Independent semantic grounding outside the same trusted specification chain.
 - Independence/authority of global anchors.
 - External signer/process isolation for receipt provenance.
 - Atomic coupling of durable idempotency with the real external side effect.
