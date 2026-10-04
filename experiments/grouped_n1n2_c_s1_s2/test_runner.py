@@ -234,7 +234,7 @@ def test_s2_contract_checks_are_independent(state_change, policy_change, expecte
     fn2 = final_n2(boundary, loop_result=loop, review={"round_id":99,"decision":"CLEAR","issues":[]}, transition_receipt=transition)
     cp = make_checkpoint(boundary, transition_receipt=transition, loop_result=loop, final_n2_receipt=fn2)
     s1 = s1_verify(boundary, checkpoint=cp, transition_receipt=transition, final_n2_receipt=fn2, current_state=state, policy=policy)
-    out = s2_decide(boundary, checkpoint=cp, s1_receipt=s1, current_state=state, policy=policy, action_nonce="n")
+    out = s2_decide(boundary, checkpoint=cp, s1_receipt=s1, current_state=state, policy=policy)
     assert boundary.verify(out, issuer="S2", kind="terminal")["terminal_status"] == expected
 
 
@@ -274,7 +274,7 @@ def test_global_goal_never_inferred_from_contract_pass(anchor, expected):
     )
     cp=make_checkpoint(boundary,transition_receipt=transition,loop_result=loop,final_n2_receipt=fn2)
     s1=s1_verify(boundary,checkpoint=cp,transition_receipt=transition,final_n2_receipt=fn2,current_state=state,policy=policy)
-    s2=s2_decide(boundary,checkpoint=cp,s1_receipt=s1,current_state=state,policy=policy,action_nonce="z")
+    s2=s2_decide(boundary,checkpoint=cp,s1_receipt=s1,current_state=state,policy=policy)
     payload=boundary.verify(s2,issuer="S2",kind="terminal")
     assert payload["contract_status"] == "PASS"
     assert payload["terminal_status"] == expected
@@ -360,7 +360,7 @@ def test_s1_receipt_cannot_be_reused_for_other_checkpoint():
     cp["payload"]["candidate"]["action"]["amount"] = 39
     s2=s2_decide(
         boundary, checkpoint=cp, s1_receipt=f["s1"],
-        current_state=f["state"], policy=f["policy"], action_nonce="other"
+        current_state=f["state"], policy=f["policy"]
     )
     assert boundary.verify(s2, issuer="S2", kind="terminal")["terminal_status"] == "BLOCK"
 
@@ -380,7 +380,7 @@ def test_final_n2_challenge_reaches_terminal_conflict():
     )
     s2=s2_decide(
         boundary,checkpoint=cp,s1_receipt=s1,
-        current_state=f["state"],policy=f["policy"],action_nonce="n2-advisory"
+        current_state=f["state"],policy=f["policy"]
     )
     payload = boundary.verify(s2,issuer="S2",kind="terminal")
     assert payload["final_n2_status"] == "CONFLICT"
@@ -432,7 +432,6 @@ def test_loop_and_final_n2_statuses_reach_s2(
         s1_receipt=s1,
         current_state=f["state"],
         policy=f["policy"],
-        action_nonce="loop-n2-regression",
     )
     payload = boundary.verify(s2, issuer="S2", kind="terminal")
     assert payload["loop_status"] == expected_loop
@@ -518,7 +517,7 @@ def _terminal_with_anchor(boundary, anchor, anchor_receipt=None):
     )
     cp=make_checkpoint(boundary,transition_receipt=tr,loop_result=loop,final_n2_receipt=fn2)
     s1=s1_verify(boundary,checkpoint=cp,transition_receipt=tr,final_n2_receipt=fn2,current_state=state,policy=policy)
-    s2=s2_decide(boundary,checkpoint=cp,s1_receipt=s1,current_state=state,policy=policy,action_nonce="anchor-regression")
+    s2=s2_decide(boundary,checkpoint=cp,s1_receipt=s1,current_state=state,policy=policy)
     return boundary.verify(s2,issuer="S2",kind="terminal")
 
 
@@ -604,7 +603,7 @@ def _terminal_with_evidence(boundary, evidence_root, evidence_receipt=None):
     )
     cp=make_checkpoint(boundary,transition_receipt=tr,loop_result=loop,final_n2_receipt=fn2)
     s1=s1_verify(boundary,checkpoint=cp,transition_receipt=tr,final_n2_receipt=fn2,current_state=state,policy=policy)
-    s2=s2_decide(boundary,checkpoint=cp,s1_receipt=s1,current_state=state,policy=policy,action_nonce="evidence-regression")
+    s2=s2_decide(boundary,checkpoint=cp,s1_receipt=s1,current_state=state,policy=policy)
     return boundary.verify(s1,issuer="S1",kind="integrity"), boundary.verify(s2,issuer="S2",kind="terminal")
 
 
@@ -720,3 +719,43 @@ def test_executor_fails_closed_without_durable_ledger(tmp_path):
         action=f["output"]["action"],
         nonce_ledger=None,
     ) == "BLOCK"
+
+
+def test_s2_recertification_cannot_rotate_execution_token(tmp_path):
+    boundary, f = fx()
+    ledger = r.FileNonceLedger(tmp_path / "ledger")
+    action = f["output"]["action"]
+    assert execute(
+        boundary,
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=action,
+        nonce_ledger=ledger,
+    ) == "EXECUTED"
+
+    second_s2 = s2_decide(
+        boundary,
+        checkpoint=f["checkpoint"],
+        s1_receipt=f["s1"],
+        current_state=f["state"],
+        policy=f["policy"],
+    )
+    first_terminal = boundary.verify(f["s2"], issuer="S2", kind="terminal")
+    second_terminal = boundary.verify(second_s2, issuer="S2", kind="terminal")
+    assert first_terminal["execution_token"] == second_terminal["execution_token"]
+    assert first_terminal["execution_token"] == r._execution_token("pay-alice")
+
+    second_output = render_readonly(
+        boundary,
+        terminal_receipt=second_s2,
+        presentation={"text": "same goal recertified"},
+    )
+    assert execute(
+        boundary,
+        output=second_output,
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=second_output["action"],
+        nonce_ledger=ledger,
+    ) == "NOOP"

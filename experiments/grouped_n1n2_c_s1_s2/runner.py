@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -100,7 +100,7 @@ class FileNonceLedger:
 
     def consume(self, nonce: str) -> bool:
         if not _name(nonce):
-            raise ProtocolError("invalid_action_nonce")
+            raise ProtocolError("invalid_execution_token")
         name = hashlib.sha256(nonce.encode("utf-8")).hexdigest() + ".nonce"
         path = self.root / name
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -660,6 +660,15 @@ def _n2_decision_status(decision: str) -> str:
     raise ProtocolError("invalid_n2_decision")
 
 
+def _execution_token(goal_id: str) -> str:
+    if not _name(goal_id):
+        raise ProtocolError("invalid_goal_id")
+    # Stable idempotency identity: re-certifying the same trusted goal must not
+    # mint a fresh execution token. A genuinely new intended operation must
+    # use a distinct goal_id at the trusted transition boundary.
+    return digest({"kind": "goal-execution", "goal_id": goal_id})
+
+
 def s2_decide(
     boundary: TrustedBoundary,
     *,
@@ -667,15 +676,12 @@ def s2_decide(
     s1_receipt: dict[str, Any],
     current_state: dict[str, Any],
     policy: dict[str, Any],
-    action_nonce: str,
 ) -> dict[str, Any]:
     try:
         cp = boundary.verify(checkpoint, issuer="C", kind="checkpoint")
         s1 = boundary.verify(s1_receipt, issuer="S1", kind="integrity")
         validate_state(current_state)
         validate_policy(policy)
-        if not _name(action_nonce):
-            raise ProtocolError("invalid_action_nonce")
         if s1["checkpoint_hash"] != digest(checkpoint):
             raise ProtocolError("s1_wrong_checkpoint")
         integrity = s1["status"]
@@ -695,6 +701,7 @@ def s2_decide(
             cp["global_anchor"], current_state["version"], provenance_verified=provenance_verified
         )
         terminal = worst_status(integrity, loop_status, final_n2_status, contract, global_status)
+        execution_token = _execution_token(cp["goal_id"])
         payload = {
             "terminal_status": terminal,
             "integrity_status": integrity,
@@ -708,7 +715,7 @@ def s2_decide(
             "contract_hash": digest(policy),
             "action": deepcopy(cp["candidate"]["action"]),
             "action_hash": digest(cp["candidate"]["action"]),
-            "action_nonce": action_nonce,
+            "execution_token": execution_token,
         }
     except (ProtocolError, KeyError, TypeError, ValueError, OverflowError):
         payload = {
@@ -724,7 +731,7 @@ def s2_decide(
             "contract_hash": digest(policy) if type(policy) is dict else None,
             "action": None,
             "action_hash": None,
-            "action_nonce": action_nonce if type(action_nonce) is str else None,
+            "execution_token": None,
         }
     return boundary.issue(issuer="S2", kind="terminal", payload=payload)
 
@@ -772,8 +779,8 @@ def execute(
             return "BLOCK"
         if _contract_status({"action": action}, current_state, current_policy) != "PASS":
             return "BLOCK"
-        nonce = terminal["action_nonce"]
-        if not nonce_ledger.consume(nonce):
+        execution_token = terminal["execution_token"]
+        if not nonce_ledger.consume(execution_token):
             return "NOOP"
         return "EXECUTED"
     except (ProtocolError, KeyError, TypeError, ValueError, OverflowError, OSError):
@@ -817,7 +824,7 @@ def default_fixture(boundary: TrustedBoundary):
     s1 = s1_verify(boundary, checkpoint=checkpoint, transition_receipt=transition, final_n2_receipt=final_receipt,
                    current_state=state, policy=policy)
     s2 = s2_decide(boundary, checkpoint=checkpoint, s1_receipt=s1, current_state=state, policy=policy,
-                   action_nonce="action-1")
+)
     output = render_readonly(boundary, terminal_receipt=s2, presentation={"text": "Transfer ready."})
     return {"state": state, "policy": policy, "anchor": anchor, "transition": transition,
             "initial": initial, "exchanges": exchanges, "loop": loop, "final_n2": final_receipt,

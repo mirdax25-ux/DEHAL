@@ -30,7 +30,7 @@ The experiment does **not** call an LLM and does not claim universal correctness
 - S1 checks checkpoint, transition, current state/policy and provenance bindings. It does not decide the global semantic goal.
 - S2 independently checks the concrete action/policy, global-goal anchor and S1 receipt. It emits the only terminal receipt.
 - Final N1 is read-only presentation: it controls only explanation text. Trusted status/action fields are copied directly from S2.
-- Executor accepts only the S2 terminal receipt, exact action hash, exact current-state hash/version, exact current-policy hash/semantics, and a nonce consumed through a trusted file-backed ledger.
+- Executor accepts only the S2 terminal receipt, exact action hash, exact current-state hash/version, exact current-policy hash/semantics, and an S2-derived stable execution token consumed through a trusted file-backed ledger.
 
 ## Bounded status semantics
 
@@ -45,7 +45,7 @@ python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/
 python -m compileall -q experiments/grouped_n1n2_c_s1_s2
 ```
 
-Experiment version **0.1.5** currently has **437 passing experiment tests** in the local isolated environment: 115 targeted/regression tests plus 322 deterministic fuzz/property tests. The combined existing repository suite plus this experiment has **732 passing tests** locally. Hosted GitHub CI is not claimed until separately observed.
+Experiment version **0.1.6** currently has **438 passing experiment tests** in the local isolated environment: 116 targeted/regression tests plus 322 deterministic fuzz/property tests. The combined existing repository suite plus this experiment has **733 passing tests** locally. Hosted GitHub CI is not claimed until separately observed.
 
 ## Explicit limitations
 
@@ -54,5 +54,6 @@ Experiment version **0.1.5** currently has **437 passing experiment tests** in t
 - An N2 receipt authenticates the message path, not the truth of N2's claim.
 - A separately authenticated global anchor can still be wrong, compromised or share a common upstream source. Provenance is not truth, and the prototype's second HMAC key models a distinct trust root rather than production-grade key isolation.
 - The remaining fundamental boundary is specification validation: a perfectly implemented kernel can faithfully enforce the wrong rule.
-- The file-backed nonce ledger provides local at-most-once replay protection across process restart, not a distributed exactly-once transaction. A production executor must couple idempotency to the real external side effect.
+- The file-backed ledger provides local at-most-once replay protection across process restart, not a distributed exactly-once transaction. A production executor must couple idempotency to the real external side effect.
+- goal_id is now the stable idempotency identity for one intended side effect; trusted upstream code must not mint a new goal_id merely to retry the same operation.
 - No deploy, merge, UI, network service, database or production action is performed.

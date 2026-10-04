@@ -70,7 +70,7 @@ def test_fuzz_terminal_receipt_tamper_never_executes(seed, tmp_path):
     receipt = out["terminal_receipt"]
     choice = rng.choice((
         "mac", "issuer", "kind", "terminal_status", "state_version",
-        "state_hash", "action_hash", "action_nonce", "contract_hash",
+        "state_hash", "action_hash", "execution_token", "contract_hash",
     ))
     if choice in ("mac", "state_hash", "action_hash", "contract_hash"):
         if choice == "mac":
@@ -85,8 +85,8 @@ def test_fuzz_terminal_receipt_tamper_never_executes(seed, tmp_path):
         receipt["payload"]["terminal_status"] = rng.choice(("UNKNOWN", "BLOCK", "CONFLICT"))
     elif choice == "state_version":
         receipt["payload"]["state_version"] += rng.randint(1, 20)
-    elif choice == "action_nonce":
-        receipt["payload"]["action_nonce"] = "nonce_" + rand_text(rng, 10)
+    elif choice == "execution_token":
+        receipt["payload"]["execution_token"] = "nonce_" + rand_text(rng, 10)
     assert r.execute(b, output=out, current_state=f["state"], current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
@@ -186,7 +186,6 @@ def test_fuzz_untrusted_global_anchor_cannot_create_global_pass(seed):
     )
     s2 = r.s2_decide(
         b, checkpoint=cp, s1_receipt=s1, current_state=state, policy=policy,
-        action_nonce="nonce_" + rand_text(rng, 8)
     )
     terminal = b.verify(s2, issuer="S2", kind="terminal")
     assert terminal["contract_status"] == "PASS"

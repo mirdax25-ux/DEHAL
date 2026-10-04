@@ -10,11 +10,11 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
-Current experiment version: **0.1.5**
+Current experiment version: **0.1.6**
 
 Preparation environment:
 - python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
-  - **437 passed** = 115 targeted/regression + 322 deterministic fuzz/property
+  - **438 passed** = 116 targeted/regression + 322 deterministic fuzz/property
 - python -m compileall -q experiments/grouped_n1n2_c_s1_s2
   - exit code 0
 
@@ -24,7 +24,7 @@ Post-action verification of the actual GitHub branch:
 - pytest on the checked-out experiment: **exit code 0**
 - compileall on the checked-out experiment: **exit code 0**
 
-The combined pre-existing repository tests plus this experiment were also run locally: **732 passed**. Hosted GitHub Actions are not claimed here.
+The combined pre-existing repository tests plus this experiment were also run locally: **733 passed**. Hosted GitHub Actions are not claimed here.
 
 ## Critical invariants
 
@@ -34,7 +34,7 @@ The combined pre-existing repository tests plus this experiment were also run lo
 4. S1 and S2 have different responsibilities and both operate on the same checkpoint identity.
 5. S2 does not infer global-goal PASS from contract PASS.
 6. Final N1 is presentation-only.
-7. Execution requires the exact S2 receipt, action hash, state hash/version, current-policy hash/semantics and an unused nonce recorded in a trusted file-backed ledger.
+7. Execution requires the exact S2 receipt, action hash, state hash/version, current-policy hash/semantics and the S2-derived stable execution token recorded in a trusted file-backed ledger.
 
 ## Confirmed failure fixed during implementation
 
@@ -64,6 +64,15 @@ A policy could change after S2 while the state/action stayed the same, and the e
 ## Confirmed seventh failure fixed
 
 Nonce consumption was previously stored only inside the current TrustedBoundary object. Recreating the boundary with the same keys allowed a previously executed terminal receipt to execute again. Version 0.1.5 requires a file-backed atomic nonce ledger; replay remains NOOP across boundary/process recreation when the same trusted ledger is used.
+
+
+## Confirmed eighth failure fixed
+
+The durable ledger could still be bypassed because action_nonce was an S2 caller input. Re-running S2 for the same checkpoint with a fresh nonce produced a second valid terminal receipt and the same action executed again. Version 0.1.6 removes caller nonce control and derives a stable execution token from the trusted goal_id. Re-certifying the same goal now reuses the same token and becomes NOOP after the first execution.
+
+## Stable-operation identity assumption
+
+goal_id is treated as the identity of one intended side effect. Retries must preserve it. A new real operation requires a new trusted goal_id; otherwise upstream goal-ID issuance can still defeat semantic duplicate detection.
 
 ## Remaining execution caveat
 

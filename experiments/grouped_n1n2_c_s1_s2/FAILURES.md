@@ -85,6 +85,23 @@
 
 **Version change:** remains **0.1.5** in the same execution-boundary hardening batch.
 
+
+## F8 — caller could rotate the S2 nonce and bypass durable replay protection
+
+**Failure mode:** After one certified action executed, the same checkpoint/S1/state/policy could be submitted to S2 again with a fresh caller-provided action_nonce. S2 signed the new nonce, the durable ledger saw a new key, and the same action executed a second time even though the action hash and checkpoint were unchanged.
+
+**Root cause:** The idempotency identity was caller-controlled. Durable storage cannot prevent duplicate effects when the caller can mint a new replay key for the same trusted operation.
+
+**Guardrail:** Version 0.1.6 removes action_nonce from the S2 API. S2 derives a stable execution_token from the trusted goal identity: SHA-256 over the canonical object {"kind":"goal-execution","goal_id":...}. Re-certifying the same goal therefore yields the same token, and the file-backed ledger returns NOOP after the first execution. A genuinely new intended side effect must use a distinct trusted goal_id.
+
+**Regression test:** test_s2_recertification_cannot_rotate_execution_token.
+
+**Version change:** experiment 0.1.5 -> **0.1.6**.
+
+## Known assumption — goal_id is the operation identity
+
+The replay guarantee now depends on goal_id being stable and unique for one intended external side effect. If an upstream authority deliberately creates a new goal_id for the same real-world action, this layer cannot infer that the two goals are semantically duplicates. Production integration should issue goal/operation IDs from a trusted authority and preserve them through retries.
+
 ## Known unresolved execution boundary — external side-effect atomicity
 
 The file ledger provides local at-most-once replay protection across process restart, but it is not a distributed transaction. A real external side effect and nonce-ledger commit cannot be made exactly-once by this prototype alone. Production integration must use an idempotent external operation or a transactionally coupled execution/idempotency store.
