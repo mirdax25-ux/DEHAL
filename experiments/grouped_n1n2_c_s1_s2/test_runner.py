@@ -802,3 +802,46 @@ def test_s2_recertification_cannot_rotate_execution_token(tmp_path):
         action=second_output["action"],
         nonce_ledger=ledger,
     ) == "NOOP"
+
+
+
+def test_terminal_pass_is_explicitly_bounded_not_global_truth():
+    boundary, f = fx()
+    terminal = boundary.verify(f["s2"], issuer="S2", kind="terminal")
+    assert terminal["terminal_status"] == "PASS"
+    assert terminal["epistemic_scope"] == "authenticated_inputs_and_declared_requirements_only"
+    assert terminal["global_truth_certified"] is False
+    assert f["output"]["epistemic_scope"] == terminal["epistemic_scope"]
+    assert f["output"]["global_truth_certified"] is False
+
+
+def test_readonly_layer_cannot_upgrade_bounded_pass_to_global_truth(tmp_path):
+    boundary, f = fx()
+    with pytest.raises(ProtocolError):
+        render_readonly(
+            boundary,
+            terminal_receipt=f["s2"],
+            presentation={"text": "Universally correct.", "global_truth_certified": True},
+        )
+    tampered = deepcopy(f["output"])
+    tampered["global_truth_certified"] = True
+    assert execute(
+        boundary,
+        output=tampered,
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    ) == "BLOCK"
+
+
+def test_common_mode_wrong_spec_remains_explicit_trust_boundary():
+    boundary, f = fx()
+    # Deliberately model a real semantic rule that is absent from every trusted
+    # input. The system can only prove conformance to what it was actually given.
+    external_requirement = {"max_amount": 30}
+    assert f["output"]["action"]["amount"] == 40
+    assert f["output"]["action"]["amount"] > external_requirement["max_amount"]
+    assert f["output"]["terminal_status"] == "PASS"
+    assert f["output"]["global_truth_certified"] is False
+    assert f["output"]["epistemic_scope"] == "authenticated_inputs_and_declared_requirements_only"

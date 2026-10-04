@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -739,6 +739,8 @@ def s2_decide(
             "action": deepcopy(cp["candidate"]["action"]),
             "action_hash": digest(cp["candidate"]["action"]),
             "execution_token": execution_token,
+            "epistemic_scope": "authenticated_inputs_and_declared_requirements_only",
+            "global_truth_certified": False,
         }
     except (ProtocolError, KeyError, TypeError, ValueError, OverflowError):
         payload = {
@@ -755,6 +757,8 @@ def s2_decide(
             "action": None,
             "action_hash": None,
             "execution_token": None,
+            "epistemic_scope": "authenticated_inputs_and_declared_requirements_only",
+            "global_truth_certified": False,
         }
     return boundary.issue(issuer="S2", kind="terminal", payload=payload)
 
@@ -770,6 +774,8 @@ def render_readonly(boundary: TrustedBoundary, *, terminal_receipt: dict[str, An
         "action_hash": terminal["action_hash"],
         "state_version": terminal["state_version"],
         "terminal_receipt": deepcopy(terminal_receipt),
+        "epistemic_scope": terminal["epistemic_scope"],
+        "global_truth_certified": terminal["global_truth_certified"],
         "explanation": presentation["text"],
     }
 
@@ -784,13 +790,27 @@ def execute(
     nonce_ledger: FileNonceLedger,
 ) -> str:
     try:
-        _strict_keys(output, ("terminal_status", "action", "action_hash", "state_version", "terminal_receipt", "explanation"))
+        _strict_keys(output, ("terminal_status", "action", "action_hash", "state_version", "terminal_receipt", "epistemic_scope", "global_truth_certified", "explanation"))
         terminal = boundary.verify(output["terminal_receipt"], issuer="S2", kind="terminal")
+        if (
+            output["epistemic_scope"] != terminal["epistemic_scope"]
+            or output["global_truth_certified"] is not terminal["global_truth_certified"]
+            or terminal["epistemic_scope"] != "authenticated_inputs_and_declared_requirements_only"
+            or terminal["global_truth_certified"] is not False
+        ):
+            return "BLOCK"
         validate_state(current_state)
         validate_policy(current_policy)
         if not isinstance(nonce_ledger, FileNonceLedger):
             return "BLOCK"
         if output["terminal_status"] != terminal["terminal_status"] or terminal["terminal_status"] != "PASS":
+            return "BLOCK"
+        if (
+            output["epistemic_scope"] != terminal["epistemic_scope"]
+            or terminal["epistemic_scope"] != "authenticated_inputs_and_declared_requirements_only"
+            or output["global_truth_certified"] is not terminal["global_truth_certified"]
+            or terminal["global_truth_certified"] is not False
+        ):
             return "BLOCK"
         if output["action_hash"] != terminal["action_hash"] or digest(action) != terminal["action_hash"]:
             return "BLOCK"

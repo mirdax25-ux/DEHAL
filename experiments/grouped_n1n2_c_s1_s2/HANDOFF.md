@@ -10,11 +10,11 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
-Current experiment version: **0.1.7**
+Current experiment version: **0.1.8**
 
 Preparation environment:
 - python -m pytest experiments/grouped_n1n2_c_s1_s2 --tb=short
-  - **441 passed** = 118 targeted/regression + 323 deterministic fuzz/property
+  - **444 passed** = prior 441 + 3 specification-scope regressions
 - python -m compileall -q experiments/grouped_n1n2_c_s1_s2
   - exit code 0
 - multiprocess nonce race: 16 spawned processes attempted one token; exactly 1 consumed it and 15 were rejected
@@ -25,7 +25,7 @@ Post-action verification of the actual GitHub branch:
 - pytest on the checked-out experiment: **exit code 0**
 - compileall on the checked-out experiment: **exit code 0**
 
-The combined pre-existing repository tests plus this experiment were also run locally after the new race regression: **736 passed**. One immediately prior combined invocation produced a large transient failure set, but two fresh reruns of the same combined scope passed; the root cause of that transient is UNKNOWN, so it is recorded as a stability warning rather than silently discarded. Hosted GitHub Actions are not claimed here.
+The combined pre-existing repository tests plus this experiment were also run locally after the new race regression: **739 passed**. One immediately prior combined invocation produced a large transient failure set, but two fresh reruns of the same combined scope passed; the root cause of that transient is UNKNOWN, so it is recorded as a stability warning rather than silently discarded. Hosted GitHub Actions are not claimed here.
 
 ## Critical invariants
 
@@ -91,3 +91,12 @@ The local file ledger is at-most-once replay protection, not an exactly-once dis
 - External signer/process isolation for receipt provenance.
 - Atomic coupling of durable idempotency with the real external side effect.
 - Live N1/N2 model integration only after deterministic invariants remain green.
+
+
+## Confirmed eleventh failure bounded, not falsely "solved"
+
+A RED regression reproduced the remaining common-mode specification failure: all authenticated inputs and deterministic gates can agree while the trusted starting specification omits a real requirement. The system returned PASS. This cannot be disproved from the same information set without inventing missing semantics.
+
+Version 0.1.8 therefore hardens the claim boundary instead of adding a fake extra verifier. S2 receipts and read-only output now state `epistemic_scope=authenticated_inputs_and_declared_requirements_only` and `global_truth_certified=false`. The executor requires those exact certified fields, so N1/presentation cannot upgrade bounded PASS into a claim of universal truth.
+
+Residual semantic completeness remains UNKNOWN unless grounded outside the same trust chain.

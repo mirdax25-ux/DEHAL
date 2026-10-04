@@ -133,3 +133,18 @@ A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact
 **Regression tests:** test_authenticated_global_anchor_cannot_replay_across_goal and test_authenticated_global_anchor_cannot_replay_across_contract.
 
 **Version change:** experiment 0.1.6 -> **0.1.7**.
+
+
+## F11 — common-mode specification error cannot be internally disproved
+
+**Failure mode:** A deliberately constructed RED regression showed that an authenticated anchor, valid receipts, intact checkpoint, S1 PASS and S2 PASS can all agree while the trusted starting specification omits a real semantic requirement. The prototype returned terminal PASS.
+
+**Root cause:** Deterministic verification can prove conformance to authenticated inputs, but it cannot derive a requirement that is absent from every trusted input. Adding another verifier fed by the same specification only repeats the same blind spot.
+
+**Guardrail:** Version 0.1.8 makes the epistemic boundary machine-readable. Every S2 terminal receipt and read-only output states `epistemic_scope=authenticated_inputs_and_declared_requirements_only` and `global_truth_certified=false`. The executor requires those exact certified fields and blocks presentation-layer attempts to upgrade bounded PASS into a universal truth claim. This does not pretend to solve a wrong specification; it prevents the system from mislabelling what was proved.
+
+**Regression tests:** `test_terminal_pass_is_explicitly_bounded_not_global_truth`, `test_readonly_layer_cannot_upgrade_bounded_pass_to_global_truth`, and `test_common_mode_wrong_spec_remains_explicit_trust_boundary`.
+
+**Version change:** experiment 0.1.7 -> **0.1.8**.
+
+**Residual:** semantic completeness of the trusted specification remains UNKNOWN unless independently grounded outside the same trust chain.
