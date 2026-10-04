@@ -350,6 +350,8 @@ def _independent_supporting_source_count(eligible: Sequence[Evidence]) -> int:
             identities.append(("ref", item.source_ref.strip()))
         if item.independence_group is not None:
             identities.append(("group", item.independence_group.strip()))
+        if item.content_sha256 is not None:
+            identities.append(("content", item.content_sha256.lower()))
         for identity in identities:
             previous = seen.setdefault(identity, index)
             parents[root(index)] = root(previous)

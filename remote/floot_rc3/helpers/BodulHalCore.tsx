@@ -137,10 +137,16 @@ export function verifyClaims(claims: any, evidence: any, now = new Date()) {
     const a = c.assertion;
     if (!a || a.op !== "json_equals" || typeof a.pointer !== "string" || !Array.isArray(c.sources) || c.sources.length < 1 || c.sources.length > 10) return invalid();
     if (c.sources.some((s:any) => !s || s.type !== "supplied" || typeof s.id !== "string" || Object.keys(s).sort().join(",") !== "id,type")) return invalid();
+    const sourceIds = c.sources.map((s:any) => s.id);
+    if (new Set(sourceIds).size !== sourceIds.length) return invalid();
     const maxAge = c.max_age_seconds ?? 300;
     if (typeof maxAge !== "number" || maxAge < 1 || maxAge > 86400) return invalid();
     const after = "after" in c ? parseTime(c.after) : null;
     if ("after" in c && after === null) return invalid();
+    const materialKeys = c.sources.map((s:any) => {
+      const item = evidenceMap.get(s.id);
+      return item ? canonicalJson(item.data) : null;
+    });
     const evs = c.sources.map((s:any, sourceIndex:number) => {
       const item = evidenceMap.get(s.id);
       const observed = item ? parseTime(item.observed_at) : null;
@@ -151,8 +157,16 @@ export function verifyClaims(claims: any, evidence: any, now = new Date()) {
       return { source_index: sourceIndex, directness: "supplied_document_read", observed_at: now.toISOString(), content_observed_at: observed === null ? undefined : new Date(observed).toISOString(), matched, fresh, post_action: postAction, eligible: fresh && postAction && matched !== null };
     });
     const eligible = evs.filter((e: any) => e.eligible);
-    const supporting = eligible.filter((e: any) => e.matched === true).length;
-    const contradicting = eligible.filter((e: any) => e.matched === false).length;
+    const seenMaterial = new Set<string>();
+    let supporting = 0;
+    let contradicting = 0;
+    for (const e of eligible) {
+      const key = materialKeys[e.source_index] ?? `source:${e.source_index}`;
+      if (seenMaterial.has(key)) continue;
+      seenMaterial.add(key);
+      if (e.matched === true) supporting += 1;
+      if (e.matched === false) contradicting += 1;
+    }
     const cc = { supporting, contradicting, unavailable_or_stale: evs.length - eligible.length };
     let classification = "UNKNOWN", approved = false, status = "BLOCK", reason = "Evidence is missing, stale, invalid, or predates the action.";
     if (supporting > 0 && contradicting > 0) { classification = "CONFLICT"; reason = "Fresh direct observations disagree on the supplied predicate; source identity/authority needs review."; }
@@ -211,7 +225,8 @@ export function guardClaim(input: any, now = new Date()): any {
   if (!["low", "high"].includes(risk)) return invalid();
 
   let boundedClaim: any;
-  if (claim.kind === "action_state") {
+  const isActionState = claim.kind === "action_state";
+  if (isActionState) {
     if (!("after" in claim) || parseTime(claim.after) === null) {
       return {
         version: SERVER_VERSION,
@@ -236,6 +251,23 @@ export function guardClaim(input: any, now = new Date()): any {
 
   const verification = verifyClaims([boundedClaim], evidence, now);
   const claimReason = verification?.claims?.[0]?.reason ?? verification.reason;
+
+  if (isActionState) {
+    return {
+      version: SERVER_VERSION,
+      core_version: CORE_VERSION,
+      guard_version: GUARD_VERSION,
+      stage: "verification",
+      approved: false,
+      classification: "UNKNOWN",
+      status: "ESCALATE",
+      reason: "trusted_post_action_evidence_required",
+      scope: SCOPE,
+      checked_at: now.toISOString(),
+      self_check: selfCheck,
+      verification,
+    };
+  }
 
   if (verification.approved && risk === "high") {
     const callerAsserted = humanApproved === true;

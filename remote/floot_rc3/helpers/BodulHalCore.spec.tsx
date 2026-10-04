@@ -133,12 +133,14 @@ describe("BodulHal 1.2.0-rc.3 remote contract", () => {
     expect(r.reason).toBe("action_final_state_boundary_required");
   });
 
-  it("guard_claim approves action_state only with post-action evidence", () => {
+  it("guard_claim fails closed on caller-only post-action timestamps", () => {
     const action = claim({kind:"action_state",after:"2026-09-27T16:29:50Z"});
     const r = guardClaim({ claim:action, evidence:[ev()], self_check:selfCheck() }, now);
     expect(r.stage).toBe("verification");
-    expect(r.classification).toBe("FACT");
-    expect(r.status).toBe("APPROVE");
+    expect(r.approved).toBe(false);
+    expect(r.classification).toBe("UNKNOWN");
+    expect(r.status).toBe("ESCALATE");
+    expect(r.reason).toBe("trusted_post_action_evidence_required");
   });
 
   it("guard_claim escalates high-risk fact without human approval", () => {
@@ -158,6 +160,31 @@ describe("BodulHal 1.2.0-rc.3 remote contract", () => {
     expect(r.human_approval.mode).toBe("fail_closed");
     expect(r.human_approval.caller_asserted).toBe(true);
     expect(r.human_approval.verified).toBe(false);
+  });
+
+
+  it("rejects duplicate source references in a bounded claim", () => {
+    const c = claim({ sources:[{type:"supplied",id:"health"},{type:"supplied",id:"health"}] });
+    const r = verifyClaims([c],[ev()],now);
+    expect(r.status).toBe("BLOCK");
+    expect(r.reason).toBe("invalid_input");
+  });
+
+  it("collapses identical supplied document aliases in receipt counts", () => {
+    const c = claim({ sources:[{type:"supplied",id:"alias-a"},{type:"supplied",id:"alias-b"}] });
+    const e1 = { id:"alias-a", data:{status:"ok",payload:{x:1}}, observed_at:ts };
+    const e2 = { id:"alias-b", data:{payload:{x:1},status:"ok"}, observed_at:ts };
+    const r = verifyClaims([c],[e1,e2],now);
+    expect(r.approved).toBe(true);
+    expect(r.claims[0].contradiction_check.supporting).toBe(1);
+  });
+
+  it("guard_claim fails closed for action_state with caller-only timestamp evidence", () => {
+    const action = claim({kind:"action_state",after:"2026-09-27T16:29:50Z"});
+    const r = guardClaim({ claim:action, evidence:[ev()], self_check:selfCheck() }, now);
+    expect(r.approved).toBe(false);
+    expect(r.status).toBe("ESCALATE");
+    expect(r.reason).toBe("trusted_post_action_evidence_required");
   });
 
   it("health advertises fail-closed remote human approval mode", () => {
