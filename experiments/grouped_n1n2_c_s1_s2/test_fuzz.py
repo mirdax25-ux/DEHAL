@@ -11,11 +11,12 @@ from experiments.grouped_n1n2_c_s1_s2 import runner as r
 
 
 KEY = b"prototype-test-key-32-bytes-long!!"
+ANCHOR_KEY = b"independent-anchor-key-32-bytes!"
 SEEDS = tuple(range(40))
 
 
 def boundary():
-    return r.TrustedBoundary(KEY)
+    return r.TrustedBoundary(KEY, ANCHOR_KEY)
 
 
 def fixture():

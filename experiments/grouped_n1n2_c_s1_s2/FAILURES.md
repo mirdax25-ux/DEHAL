@@ -36,6 +36,18 @@
 
 **Version change:** experiment 0.1.1 -> **0.1.2**.
 
+## F4 — caller could self-assert an "independent" global anchor
+
+**Failure mode:** A plain caller-supplied JSON anchor such as `{"status":"PASS","independent":true,"scope":["goal"],"state_version":7}` was accepted into the transition and could yield global-goal PASS without any separate provenance proving who issued the anchor.
+
+**Root cause:** `validate_anchor` checked shape and semantics only. The word `independent` was trusted as data instead of being bound to a distinct trust root.
+
+**Guardrail:** Version 0.1.3 introduces a separate global-anchor receipt signed with a distinct anchor trust key. S-boundary verifies that receipt before marking the anchor provenance-verified. S1 revalidates anchor-receipt integrity inside C, and S2 allows global PASS only when the anchor receipt is valid, payload-matched, in-scope, current and marked independent. A raw self-asserted anchor without receipt is allowed only as untrusted context and yields global UNKNOWN.
+
+**Regression test:** `test_self_asserted_independent_anchor_without_receipt_stays_unknown`, `test_tampered_global_anchor_receipt_rejected`, `test_global_anchor_receipt_from_wrong_trust_root_rejected`, and `test_global_anchor_receipt_payload_mismatch_rejected`.
+
+**Version change:** experiment 0.1.2 -> **0.1.3**.
+
 ## Known unresolved boundary — wrong specification
 
 A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact-action executor can still enforce a semantically wrong/incomplete policy if the trusted starting specification itself is wrong. This is not classified as fixed. The architecture must preserve bounded claims and use UNKNOWN when independent semantic grounding is unavailable.

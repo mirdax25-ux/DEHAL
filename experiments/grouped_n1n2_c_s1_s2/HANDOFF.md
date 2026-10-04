@@ -10,11 +10,11 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
-Current experiment version: **0.1.2**
+Current experiment version: **0.1.3**
 
 Preparation environment:
 - python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
-  - **424 passed** = 102 targeted/regression + 322 deterministic fuzz/property
+  - **429 passed** = 107 targeted/regression + 322 deterministic fuzz/property
 - python -m compileall -q experiments/grouped_n1n2_c_s1_s2
   - exit code 0
 
@@ -47,6 +47,10 @@ The initial fuzz-expanded attack found that loop CONFLICT/UNKNOWN and final N2 C
 ## Confirmed third failure fixed
 
 A caller could previously fabricate a plain loop_result with PASS and skip N1<->N2 entirely. Version 0.1.2 introduces an authoritative loop receipt bound to transition, candidate, loop status and receipt-chain root. final N2, C and S1 verify this provenance chain. Six new regression cases cover the reproduced bypass and tampering variants.
+
+## Confirmed fourth failure fixed
+
+A plain JSON global anchor could self-assert `independent=true` and obtain global PASS. Version 0.1.3 requires a separately authenticated anchor receipt for global PASS. Raw/self-asserted anchors now remain UNKNOWN. Targeted regressions cover missing receipt, wrong trust root, receipt tampering and payload mismatch.
 
 ## Next attacks
 

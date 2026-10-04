@@ -18,7 +18,7 @@ import math
 import re
 from typing import Any
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -94,13 +94,51 @@ def worst_status(*statuses: str) -> str:
     return max(statuses, key=lambda s: STATUS_ORDER[s])
 
 
+def issue_global_anchor(anchor_secret: bytes, anchor: dict[str, Any]) -> dict[str, Any]:
+    """Model a separate global-goal authority with a distinct trust root."""
+    if type(anchor_secret) is not bytes or not anchor_secret:
+        raise ProtocolError("invalid_anchor_secret")
+    validate_anchor(anchor)
+    body = {
+        "v": VERSION,
+        "issuer": "GLOBAL-ANCHOR",
+        "kind": "goal",
+        "payload": deepcopy(anchor),
+    }
+    mac = hmac.new(anchor_secret, canonical(body), hashlib.sha256).hexdigest()
+    return {**body, "mac": mac}
+
+
 @dataclass
 class TrustedBoundary:
     secret: bytes
+    anchor_secret: bytes
     consumed_tokens: set[str] = field(default_factory=set)
+
+    def __post_init__(self) -> None:
+        if type(self.secret) is not bytes or not self.secret:
+            raise ProtocolError("invalid_boundary_secret")
+        if type(self.anchor_secret) is not bytes or not self.anchor_secret:
+            raise ProtocolError("invalid_anchor_secret")
 
     def _mac(self, body: dict[str, Any]) -> str:
         return hmac.new(self.secret, canonical(body), hashlib.sha256).hexdigest()
+
+    def verify_global_anchor(self, receipt: Any) -> dict[str, Any]:
+        _strict_keys(receipt, ("v", "issuer", "kind", "payload", "mac"))
+        if (
+            receipt["v"] != VERSION
+            or receipt["issuer"] != "GLOBAL-ANCHOR"
+            or receipt["kind"] != "goal"
+            or type(receipt["mac"]) is not str
+        ):
+            raise ProtocolError("invalid_anchor_receipt")
+        body = {k: deepcopy(receipt[k]) for k in ("v", "issuer", "kind", "payload")}
+        expected = hmac.new(self.anchor_secret, canonical(body), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(receipt["mac"], expected):
+            raise ProtocolError("anchor_receipt_mac_mismatch")
+        validate_anchor(receipt["payload"])
+        return deepcopy(receipt["payload"])
 
     def issue(self, *, issuer: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not _name(issuer) or not _name(kind):
@@ -130,11 +168,18 @@ class TrustedBoundary:
         evidence_root: str,
         previous_receipt_hash: str,
         global_anchor: dict[str, Any],
+        global_anchor_receipt: dict[str, Any] | None = None,
         phase_id: str = "group3",
     ) -> dict[str, Any]:
         validate_state(state)
         validate_policy(policy)
         validate_anchor(global_anchor)
+        anchor_verified = False
+        if global_anchor_receipt is not None:
+            verified_anchor = self.verify_global_anchor(global_anchor_receipt)
+            if verified_anchor != global_anchor:
+                raise ProtocolError("anchor_payload_mismatch")
+            anchor_verified = True
         if not all(_name(x) for x in (goal_id, evidence_root, previous_receipt_hash, phase_id)):
             raise ProtocolError("invalid_transition_identity")
         payload = {
@@ -147,6 +192,9 @@ class TrustedBoundary:
             "previous_receipt_hash": previous_receipt_hash,
             "phase_id": phase_id,
             "global_anchor": deepcopy(global_anchor),
+            "global_anchor_verified": anchor_verified,
+            "global_anchor_receipt": deepcopy(global_anchor_receipt),
+            "global_anchor_receipt_hash": digest(global_anchor_receipt) if global_anchor_receipt is not None else None,
         }
         return self.issue(issuer="S-boundary", kind="transition", payload=payload)
 
@@ -377,6 +425,9 @@ def make_checkpoint(
         "final_n2_decision": n2["decision"],
         "final_n2_issues": list(n2["issues"]),
         "global_anchor": deepcopy(transition["global_anchor"]),
+        "global_anchor_verified": transition["global_anchor_verified"],
+        "global_anchor_receipt": deepcopy(transition["global_anchor_receipt"]),
+        "global_anchor_receipt_hash": transition["global_anchor_receipt_hash"],
     }
     return boundary.issue(issuer="C", kind="checkpoint", payload=payload)
 
@@ -398,6 +449,17 @@ def s1_verify(
         validate_state(current_state)
         validate_policy(policy)
         validate_candidate(cp["candidate"])
+        if cp["global_anchor_verified"]:
+            anchor_payload = boundary.verify_global_anchor(cp["global_anchor_receipt"])
+            anchor_integrity = (
+                anchor_payload == cp["global_anchor"]
+                and cp["global_anchor_receipt_hash"] == digest(cp["global_anchor_receipt"])
+            )
+        else:
+            anchor_integrity = (
+                cp["global_anchor_receipt"] is None
+                and cp["global_anchor_receipt_hash"] is None
+            )
         checks = {
             "transition_hash": cp["transition_hash"] == digest(transition_receipt),
             "goal": cp["goal_id"] == tr["goal_id"] == cp["candidate"]["goal_id"],
@@ -414,6 +476,7 @@ def s1_verify(
                 and n2["parent_hash"] == digest(cp["loop_receipt"])
             ),
             "n2_receipt": cp["final_n2_receipt_hash"] == digest(final_n2_receipt),
+            "global_anchor_receipt": anchor_integrity,
         }
         status = "PASS" if all(checks.values()) else "BLOCK"
         payload = {"status": status, "checkpoint_hash": digest(checkpoint), "checks": checks}
@@ -433,8 +496,10 @@ def _contract_status(candidate: dict[str, Any], state: dict[str, Any], policy: d
     return "PASS"
 
 
-def _global_status(anchor: dict[str, Any], state_version: int) -> str:
+def _global_status(anchor: dict[str, Any], state_version: int, *, provenance_verified: bool) -> str:
     validate_anchor(anchor)
+    if not provenance_verified:
+        return "UNKNOWN"
     if anchor["status"] == "CONFLICT":
         return "CONFLICT"
     if not anchor["independent"] or "goal" not in anchor["scope"] or anchor["state_version"] != state_version:
@@ -476,7 +541,16 @@ def s2_decide(
             raise ProtocolError("invalid_loop_status")
         final_n2_status = _n2_decision_status(cp["final_n2_decision"])
         contract = _contract_status(cp["candidate"], current_state, policy)
-        global_status = _global_status(cp["global_anchor"], current_state["version"])
+        provenance_verified = False
+        if cp["global_anchor_verified"]:
+            anchor_payload = boundary.verify_global_anchor(cp["global_anchor_receipt"])
+            provenance_verified = (
+                anchor_payload == cp["global_anchor"]
+                and cp["global_anchor_receipt_hash"] == digest(cp["global_anchor_receipt"])
+            )
+        global_status = _global_status(
+            cp["global_anchor"], current_state["version"], provenance_verified=provenance_verified
+        )
         terminal = worst_status(integrity, loop_status, final_n2_status, contract, global_status)
         payload = {
             "terminal_status": terminal,
@@ -553,6 +627,7 @@ def default_fixture(boundary: TrustedBoundary):
     state = {"version": 7, "balance": 100, "verified_recipients": ["alice"]}
     policy = {"schema_version": 1, "contract_id": "transfer-v1", "max_amount": 80, "allowed_actions": ["transfer"]}
     anchor = {"status": "PASS", "independent": True, "scope": ["goal"], "state_version": 7}
+    anchor_receipt = issue_global_anchor(boundary.anchor_secret, anchor)
     transition = boundary.make_transition_envelope(
         goal_id="pay-alice",
         state=state,
@@ -560,6 +635,7 @@ def default_fixture(boundary: TrustedBoundary):
         evidence_root="evidence-root-1",
         previous_receipt_hash="root-receipt-1",
         global_anchor=anchor,
+        global_anchor_receipt=anchor_receipt,
     )
     initial = {"goal_id": "pay-alice", "state_version": 7,
                "action": {"type": "transfer", "recipient": "alice", "amount": 50, "memo": "invoice"}}
