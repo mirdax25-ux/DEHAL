@@ -10,11 +10,11 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
-Current experiment version: **0.1.3**
+Current experiment version: **0.1.4**
 
 Preparation environment:
 - python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
-  - **429 passed** = 107 targeted/regression + 322 deterministic fuzz/property
+  - **434 passed** = 112 targeted/regression + 322 deterministic fuzz/property
 - python -m compileall -q experiments/grouped_n1n2_c_s1_s2
   - exit code 0
 
@@ -51,6 +51,10 @@ A caller could previously fabricate a plain loop_result with PASS and skip N1<->
 ## Confirmed fourth failure fixed
 
 A plain JSON global anchor could self-assert `independent=true` and obtain global PASS. Version 0.1.3 requires a separately authenticated anchor receipt for global PASS. Raw/self-asserted anchors now remain UNKNOWN. Targeted regressions cover missing receipt, wrong trust root, receipt tampering and payload mismatch.
+
+## Confirmed fifth failure fixed
+
+The transition previously authenticated only the continuity of an arbitrary evidence_root string, not its provenance. Version 0.1.4 requires a separate evidence-authority receipt bound to evidence root, state version and contract hash for S1 PASS. Missing evidence provenance now yields UNKNOWN; tampered/wrong-root receipts fail closed.
 
 ## Next attacks
 

@@ -48,6 +48,18 @@
 
 **Version change:** experiment 0.1.2 -> **0.1.3**.
 
+## F5 — evidence_root was an unauthenticated label
+
+**Failure mode:** A caller could set `evidence_root="no-real-evidence"` without any evidence receipt. The transition, checkpoint and S1 all accepted the label, and the system reached terminal PASS despite no provenance proving that the root came from an evidence authority.
+
+**Root cause:** The transition bound the evidence-root string cryptographically after receipt creation, but did not authenticate who supplied that root. S1 therefore checked continuity of an untrusted label rather than evidence provenance.
+
+**Guardrail:** Version 0.1.4 introduces a distinct evidence-authority receipt and trust key. The receipt binds `evidence_root + state_version + contract_hash`. S-boundary validates the receipt before marking evidence provenance verified; C carries it forward; S1 re-verifies it. Missing evidence receipt yields S1 UNKNOWN; wrong key, tampering or binding mismatch fail closed.
+
+**Regression test:** `test_self_asserted_evidence_root_without_receipt_stays_unknown`, `test_tampered_evidence_receipt_rejected`, `test_evidence_receipt_from_wrong_trust_root_rejected`, and `test_evidence_receipt_binding_mismatch_rejected`.
+
+**Version change:** experiment 0.1.3 -> **0.1.4**.
+
 ## Known unresolved boundary — wrong specification
 
 A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact-action executor can still enforce a semantically wrong/incomplete policy if the trusted starting specification itself is wrong. This is not classified as fixed. The architecture must preserve bounded claims and use UNKNOWN when independent semantic grounding is unavailable.

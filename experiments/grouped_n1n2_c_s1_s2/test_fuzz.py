@@ -12,11 +12,12 @@ from experiments.grouped_n1n2_c_s1_s2 import runner as r
 
 KEY = b"prototype-test-key-32-bytes-long!!"
 ANCHOR_KEY = b"independent-anchor-key-32-bytes!"
+EVIDENCE_KEY = b"independent-evidence-key-32-bytes"
 SEEDS = tuple(range(40))
 
 
 def boundary():
-    return r.TrustedBoundary(KEY, ANCHOR_KEY)
+    return r.TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY)
 
 
 def fixture():
@@ -147,13 +148,19 @@ def test_fuzz_untrusted_global_anchor_cannot_create_global_pass(seed):
     else:
         anchor["status"] = "UNKNOWN"
 
+    evidence_root = "evidence-root"
+    evidence_receipt = r.issue_evidence_root(
+        EVIDENCE_KEY, evidence_root=evidence_root,
+        state_version=state["version"], contract_hash=r.digest(policy)
+    )
     tr = b.make_transition_envelope(
         goal_id="pay-alice",
         state=state,
         policy=policy,
-        evidence_root="evidence-root",
+        evidence_root=evidence_root,
         previous_receipt_hash="previous-root",
         global_anchor=anchor,
+        evidence_receipt=evidence_receipt,
     )
     initial = {
         "goal_id": "pay-alice",

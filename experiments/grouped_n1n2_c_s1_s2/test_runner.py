@@ -20,10 +20,11 @@ worst_status = r.worst_status
 
 KEY = b"prototype-test-key-32-bytes-long!!"
 ANCHOR_KEY = b"independent-anchor-key-32-bytes!"
+EVIDENCE_KEY = b"independent-evidence-key-32-bytes"
 
 
 def b():
-    return TrustedBoundary(KEY, ANCHOR_KEY)
+    return TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY)
 
 
 def fx():
@@ -214,9 +215,16 @@ def test_s2_contract_checks_are_independent(state_change, policy_change, expecte
     policy = deepcopy(f["policy"])
     policy.update(policy_change)
     anchor = {"status":"PASS","independent":True,"scope":["goal"],"state_version":state["version"]}
+    anchor_receipt = r.issue_global_anchor(ANCHOR_KEY, anchor)
+    evidence_root = "e2"
+    evidence_receipt = r.issue_evidence_root(
+        EVIDENCE_KEY, evidence_root=evidence_root,
+        state_version=state["version"], contract_hash=digest(policy)
+    )
     transition = boundary.make_transition_envelope(
         goal_id="pay-alice", state=state, policy=policy,
-        evidence_root="e2", previous_receipt_hash="p2", global_anchor=anchor
+        evidence_root=evidence_root, previous_receipt_hash="p2", global_anchor=anchor,
+        global_anchor_receipt=anchor_receipt, evidence_receipt=evidence_receipt
     )
     initial = deepcopy(f["initial"])
     initial["state_version"] = state["version"]
@@ -241,10 +249,15 @@ def test_global_goal_never_inferred_from_contract_pass(anchor, expected):
     state={"version":7,"balance":100,"verified_recipients":["alice"]}
     policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
     anchor_receipt = r.issue_global_anchor(ANCHOR_KEY, anchor)
+    evidence_root = "e"
+    evidence_receipt = r.issue_evidence_root(
+        EVIDENCE_KEY, evidence_root=evidence_root,
+        state_version=state["version"], contract_hash=digest(policy)
+    )
     transition=boundary.make_transition_envelope(
         goal_id="pay-alice",state=state,policy=policy,
-        evidence_root="e",previous_receipt_hash="p",global_anchor=anchor,
-        global_anchor_receipt=anchor_receipt
+        evidence_root=evidence_root,previous_receipt_hash="p",global_anchor=anchor,
+        global_anchor_receipt=anchor_receipt,evidence_receipt=evidence_receipt
     )
     initial={"goal_id":"pay-alice","state_version":7,
              "action":{"type":"transfer","recipient":"alice","amount":40,"memo":"x"}}
@@ -479,10 +492,16 @@ def test_loop_result_tamper_cannot_reach_final_n2(mutation):
 def _terminal_with_anchor(boundary, anchor, anchor_receipt=None):
     state={"version":7,"balance":100,"verified_recipients":["alice"]}
     policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
+    evidence_root="anchor-regression"
+    evidence_receipt=r.issue_evidence_root(
+        EVIDENCE_KEY,evidence_root=evidence_root,
+        state_version=state["version"],contract_hash=digest(policy)
+    )
     tr=boundary.make_transition_envelope(
         goal_id="pay-alice",state=state,policy=policy,
-        evidence_root="anchor-regression",previous_receipt_hash="anchor-prev",
-        global_anchor=anchor,global_anchor_receipt=anchor_receipt
+        evidence_root=evidence_root,previous_receipt_hash="anchor-prev",
+        global_anchor=anchor,global_anchor_receipt=anchor_receipt,
+        evidence_receipt=evidence_receipt
     )
     initial={"goal_id":"pay-alice","state_version":7,
              "action":{"type":"transfer","recipient":"alice","amount":40,"memo":"x"}}
@@ -556,4 +575,92 @@ def test_global_anchor_receipt_payload_mismatch_rejected():
             policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]},
             evidence_root="e",previous_receipt_hash="p",global_anchor=supplied,
             global_anchor_receipt=receipt
+        )
+
+
+def _terminal_with_evidence(boundary, evidence_root, evidence_receipt=None):
+    state={"version":7,"balance":100,"verified_recipients":["alice"]}
+    policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
+    tr=boundary.make_transition_envelope(
+        goal_id="pay-alice",state=state,policy=policy,
+        evidence_root=evidence_root,previous_receipt_hash="evidence-prev",
+        global_anchor=anchor,global_anchor_receipt=anchor_receipt,
+        evidence_receipt=evidence_receipt
+    )
+    initial={"goal_id":"pay-alice","state_version":7,
+             "action":{"type":"transfer","recipient":"alice","amount":40,"memo":"x"}}
+    loop=n1_n2_loop(
+        boundary,initial_candidate=initial,
+        exchanges=[{"n2":{"round_id":0,"decision":"CLEAR","issues":[]}}],
+        transition_receipt=tr
+    )
+    fn2=final_n2(
+        boundary,loop_result=loop,
+        review={"round_id":99,"decision":"CLEAR","issues":[]},
+        transition_receipt=tr
+    )
+    cp=make_checkpoint(boundary,transition_receipt=tr,loop_result=loop,final_n2_receipt=fn2)
+    s1=s1_verify(boundary,checkpoint=cp,transition_receipt=tr,final_n2_receipt=fn2,current_state=state,policy=policy)
+    s2=s2_decide(boundary,checkpoint=cp,s1_receipt=s1,current_state=state,policy=policy,action_nonce="evidence-regression")
+    return boundary.verify(s1,issuer="S1",kind="integrity"), boundary.verify(s2,issuer="S2",kind="terminal")
+
+
+def test_self_asserted_evidence_root_without_receipt_stays_unknown():
+    boundary=b()
+    s1,terminal=_terminal_with_evidence(boundary,"self-asserted-root",None)
+    assert s1["status"] == "UNKNOWN"
+    assert terminal["contract_status"] == "PASS"
+    assert terminal["global_goal_status"] == "PASS"
+    assert terminal["terminal_status"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize("mutation", ["mac","payload"])
+def test_tampered_evidence_receipt_rejected(mutation):
+    boundary=b()
+    state={"version":7,"balance":100,"verified_recipients":["alice"]}
+    policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
+    receipt=r.issue_evidence_root(EVIDENCE_KEY,evidence_root="e",state_version=7,contract_hash=digest(policy))
+    if mutation == "mac":
+        receipt["mac"]="0"*64
+    else:
+        receipt["payload"]["evidence_root"]="other"
+    with pytest.raises(ProtocolError):
+        boundary.make_transition_envelope(
+            goal_id="pay-alice",state=state,policy=policy,
+            evidence_root="e",previous_receipt_hash="p",global_anchor=anchor,
+            global_anchor_receipt=anchor_receipt,evidence_receipt=receipt
+        )
+
+
+def test_evidence_receipt_from_wrong_trust_root_rejected():
+    boundary=b()
+    state={"version":7,"balance":100,"verified_recipients":["alice"]}
+    policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
+    receipt=r.issue_evidence_root(b"wrong-evidence-root-key",evidence_root="e",state_version=7,contract_hash=digest(policy))
+    with pytest.raises(ProtocolError):
+        boundary.make_transition_envelope(
+            goal_id="pay-alice",state=state,policy=policy,
+            evidence_root="e",previous_receipt_hash="p",global_anchor=anchor,
+            global_anchor_receipt=anchor_receipt,evidence_receipt=receipt
+        )
+
+
+def test_evidence_receipt_binding_mismatch_rejected():
+    boundary=b()
+    state={"version":7,"balance":100,"verified_recipients":["alice"]}
+    policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
+    receipt=r.issue_evidence_root(EVIDENCE_KEY,evidence_root="different-root",state_version=7,contract_hash=digest(policy))
+    with pytest.raises(ProtocolError):
+        boundary.make_transition_envelope(
+            goal_id="pay-alice",state=state,policy=policy,
+            evidence_root="e",previous_receipt_hash="p",global_anchor=anchor,
+            global_anchor_receipt=anchor_receipt,evidence_receipt=receipt
         )

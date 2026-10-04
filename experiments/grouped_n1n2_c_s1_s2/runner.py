@@ -18,7 +18,7 @@ import math
 import re
 from typing import Any
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -109,10 +109,42 @@ def issue_global_anchor(anchor_secret: bytes, anchor: dict[str, Any]) -> dict[st
     return {**body, "mac": mac}
 
 
+def issue_evidence_root(
+    evidence_secret: bytes,
+    *,
+    evidence_root: str,
+    state_version: int,
+    contract_hash: str,
+) -> dict[str, Any]:
+    """Model a separate evidence authority over the root used by S1."""
+    if type(evidence_secret) is not bytes or not evidence_secret:
+        raise ProtocolError("invalid_evidence_secret")
+    if not _name(evidence_root):
+        raise ProtocolError("invalid_evidence_root")
+    if type(state_version) is not int or state_version < 0:
+        raise ProtocolError("invalid_evidence_state_version")
+    if type(contract_hash) is not str or re.fullmatch(r"[a-f0-9]{64}", contract_hash) is None:
+        raise ProtocolError("invalid_evidence_contract_hash")
+    payload = {
+        "evidence_root": evidence_root,
+        "state_version": state_version,
+        "contract_hash": contract_hash,
+    }
+    body = {
+        "v": VERSION,
+        "issuer": "EVIDENCE-AUTHORITY",
+        "kind": "root",
+        "payload": payload,
+    }
+    mac = hmac.new(evidence_secret, canonical(body), hashlib.sha256).hexdigest()
+    return {**body, "mac": mac}
+
+
 @dataclass
 class TrustedBoundary:
     secret: bytes
     anchor_secret: bytes
+    evidence_secret: bytes
     consumed_tokens: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
@@ -120,6 +152,8 @@ class TrustedBoundary:
             raise ProtocolError("invalid_boundary_secret")
         if type(self.anchor_secret) is not bytes or not self.anchor_secret:
             raise ProtocolError("invalid_anchor_secret")
+        if type(self.evidence_secret) is not bytes or not self.evidence_secret:
+            raise ProtocolError("invalid_evidence_secret")
 
     def _mac(self, body: dict[str, Any]) -> str:
         return hmac.new(self.secret, canonical(body), hashlib.sha256).hexdigest()
@@ -139,6 +173,29 @@ class TrustedBoundary:
             raise ProtocolError("anchor_receipt_mac_mismatch")
         validate_anchor(receipt["payload"])
         return deepcopy(receipt["payload"])
+
+    def verify_evidence_root(self, receipt: Any) -> dict[str, Any]:
+        _strict_keys(receipt, ("v", "issuer", "kind", "payload", "mac"))
+        if (
+            receipt["v"] != VERSION
+            or receipt["issuer"] != "EVIDENCE-AUTHORITY"
+            or receipt["kind"] != "root"
+            or type(receipt["mac"]) is not str
+        ):
+            raise ProtocolError("invalid_evidence_receipt")
+        body = {k: deepcopy(receipt[k]) for k in ("v", "issuer", "kind", "payload")}
+        expected = hmac.new(self.evidence_secret, canonical(body), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(receipt["mac"], expected):
+            raise ProtocolError("evidence_receipt_mac_mismatch")
+        payload = receipt["payload"]
+        _strict_keys(payload, ("evidence_root", "state_version", "contract_hash"))
+        if not _name(payload["evidence_root"]):
+            raise ProtocolError("invalid_evidence_root")
+        if type(payload["state_version"]) is not int or payload["state_version"] < 0:
+            raise ProtocolError("invalid_evidence_state_version")
+        if type(payload["contract_hash"]) is not str or re.fullmatch(r"[a-f0-9]{64}", payload["contract_hash"]) is None:
+            raise ProtocolError("invalid_evidence_contract_hash")
+        return deepcopy(payload)
 
     def issue(self, *, issuer: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not _name(issuer) or not _name(kind):
@@ -169,6 +226,7 @@ class TrustedBoundary:
         previous_receipt_hash: str,
         global_anchor: dict[str, Any],
         global_anchor_receipt: dict[str, Any] | None = None,
+        evidence_receipt: dict[str, Any] | None = None,
         phase_id: str = "group3",
     ) -> dict[str, Any]:
         validate_state(state)
@@ -180,6 +238,17 @@ class TrustedBoundary:
             if verified_anchor != global_anchor:
                 raise ProtocolError("anchor_payload_mismatch")
             anchor_verified = True
+        evidence_verified = False
+        if evidence_receipt is not None:
+            verified_evidence = self.verify_evidence_root(evidence_receipt)
+            expected_evidence = {
+                "evidence_root": evidence_root,
+                "state_version": state["version"],
+                "contract_hash": digest(policy),
+            }
+            if verified_evidence != expected_evidence:
+                raise ProtocolError("evidence_payload_mismatch")
+            evidence_verified = True
         if not all(_name(x) for x in (goal_id, evidence_root, previous_receipt_hash, phase_id)):
             raise ProtocolError("invalid_transition_identity")
         payload = {
@@ -189,6 +258,9 @@ class TrustedBoundary:
             "state_hash": digest(state),
             "state_version": state["version"],
             "evidence_root": evidence_root,
+            "evidence_verified": evidence_verified,
+            "evidence_receipt": deepcopy(evidence_receipt),
+            "evidence_receipt_hash": digest(evidence_receipt) if evidence_receipt is not None else None,
             "previous_receipt_hash": previous_receipt_hash,
             "phase_id": phase_id,
             "global_anchor": deepcopy(global_anchor),
@@ -415,6 +487,9 @@ def make_checkpoint(
         "state_hash": transition["state_hash"],
         "state_version": transition["state_version"],
         "evidence_root": transition["evidence_root"],
+        "evidence_verified": transition["evidence_verified"],
+        "evidence_receipt": deepcopy(transition["evidence_receipt"]),
+        "evidence_receipt_hash": transition["evidence_receipt_hash"],
         "candidate": candidate,
         "candidate_hash": digest(candidate),
         "loop_status": loop_result["loop_status"],
@@ -449,6 +524,19 @@ def s1_verify(
         validate_state(current_state)
         validate_policy(policy)
         validate_candidate(cp["candidate"])
+        if cp["evidence_verified"]:
+            evidence_payload = boundary.verify_evidence_root(cp["evidence_receipt"])
+            evidence_integrity = (
+                evidence_payload["evidence_root"] == cp["evidence_root"]
+                and evidence_payload["state_version"] == cp["state_version"]
+                and evidence_payload["contract_hash"] == cp["contract_hash"]
+                and cp["evidence_receipt_hash"] == digest(cp["evidence_receipt"])
+            )
+        else:
+            evidence_integrity = (
+                cp["evidence_receipt"] is None
+                and cp["evidence_receipt_hash"] is None
+            )
         if cp["global_anchor_verified"]:
             anchor_payload = boundary.verify_global_anchor(cp["global_anchor_receipt"])
             anchor_integrity = (
@@ -476,9 +564,15 @@ def s1_verify(
                 and n2["parent_hash"] == digest(cp["loop_receipt"])
             ),
             "n2_receipt": cp["final_n2_receipt_hash"] == digest(final_n2_receipt),
+            "evidence_receipt": evidence_integrity,
             "global_anchor_receipt": anchor_integrity,
         }
-        status = "PASS" if all(checks.values()) else "BLOCK"
+        if not all(checks.values()):
+            status = "BLOCK"
+        elif not cp["evidence_verified"]:
+            status = "UNKNOWN"
+        else:
+            status = "PASS"
         payload = {"status": status, "checkpoint_hash": digest(checkpoint), "checks": checks}
     except (ProtocolError, KeyError, TypeError, ValueError, OverflowError):
         payload = {"status": "BLOCK", "checkpoint_hash": digest(checkpoint) if type(checkpoint) is dict else None, "checks": {}}
@@ -628,14 +722,22 @@ def default_fixture(boundary: TrustedBoundary):
     policy = {"schema_version": 1, "contract_id": "transfer-v1", "max_amount": 80, "allowed_actions": ["transfer"]}
     anchor = {"status": "PASS", "independent": True, "scope": ["goal"], "state_version": 7}
     anchor_receipt = issue_global_anchor(boundary.anchor_secret, anchor)
+    evidence_root = "evidence-root-1"
+    evidence_receipt = issue_evidence_root(
+        boundary.evidence_secret,
+        evidence_root=evidence_root,
+        state_version=state["version"],
+        contract_hash=digest(policy),
+    )
     transition = boundary.make_transition_envelope(
         goal_id="pay-alice",
         state=state,
         policy=policy,
-        evidence_root="evidence-root-1",
+        evidence_root=evidence_root,
         previous_receipt_hash="root-receipt-1",
         global_anchor=anchor,
         global_anchor_receipt=anchor_receipt,
+        evidence_receipt=evidence_receipt,
     )
     initial = {"goal_id": "pay-alice", "state_version": 7,
                "action": {"type": "transfer", "recipient": "alice", "amount": 50, "memo": "invoice"}}
