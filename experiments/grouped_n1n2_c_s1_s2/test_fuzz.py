@@ -1,0 +1,234 @@
+"""Deterministic property/fuzz regressions for the grouped architecture prototype."""
+from __future__ import annotations
+
+from copy import deepcopy
+import random
+import string
+
+import pytest
+
+from experiments.grouped_n1n2_c_s1_s2 import runner as r
+
+
+KEY = b"prototype-test-key-32-bytes-long!!"
+SEEDS = tuple(range(40))
+
+
+def boundary():
+    return r.TrustedBoundary(KEY)
+
+
+def fixture():
+    b = boundary()
+    return b, r.default_fixture(b)
+
+
+def rand_text(rng, n=10):
+    alphabet = string.ascii_letters + string.digits + "_-.:"
+    return "".join(rng.choice(alphabet) for _ in range(n))
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_executor_rejects_random_action_mutation(seed):
+    rng = random.Random(seed)
+    b, f = fixture()
+    action = deepcopy(f["output"]["action"])
+    choice = rng.choice(("amount", "recipient", "type", "memo"))
+    if choice == "amount":
+        action["amount"] += rng.randint(1, 100)
+    elif choice == "recipient":
+        action["recipient"] = "u_" + rand_text(rng, 8)
+    elif choice == "type":
+        action["type"] = "a_" + rand_text(rng, 8)
+    else:
+        action["memo"] = "m_" + rand_text(rng, 12)
+    assert r.execute(b, output=f["output"], current_state=f["state"], action=action) == "BLOCK"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_executor_rejects_random_state_mutation(seed):
+    rng = random.Random(seed)
+    b, f = fixture()
+    state = deepcopy(f["state"])
+    choice = rng.choice(("version", "balance", "verified_recipients"))
+    if choice == "version":
+        state["version"] += rng.randint(1, 20)
+    elif choice == "balance":
+        state["balance"] += rng.randint(1, 100)
+    else:
+        state["verified_recipients"] = ["alice", "u_" + rand_text(rng, 8)]
+    assert r.execute(b, output=f["output"], current_state=state, action=f["output"]["action"]) == "BLOCK"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_terminal_receipt_tamper_never_executes(seed):
+    rng = random.Random(seed)
+    b, f = fixture()
+    out = deepcopy(f["output"])
+    receipt = out["terminal_receipt"]
+    choice = rng.choice((
+        "mac", "issuer", "kind", "terminal_status", "state_version",
+        "state_hash", "action_hash", "action_nonce", "contract_hash",
+    ))
+    if choice in ("mac", "state_hash", "action_hash", "contract_hash"):
+        if choice == "mac":
+            receipt["mac"] = rand_text(rng, 64)
+        else:
+            receipt["payload"][choice] = rand_text(rng, 64)
+    elif choice == "issuer":
+        receipt["issuer"] = "N1"
+    elif choice == "kind":
+        receipt["kind"] = "review"
+    elif choice == "terminal_status":
+        receipt["payload"]["terminal_status"] = rng.choice(("UNKNOWN", "BLOCK", "CONFLICT"))
+    elif choice == "state_version":
+        receipt["payload"]["state_version"] += rng.randint(1, 20)
+    elif choice == "action_nonce":
+        receipt["payload"]["action_nonce"] = "nonce_" + rand_text(rng, 10)
+    assert r.execute(b, output=out, current_state=f["state"], action=f["output"]["action"]) == "BLOCK"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_checkpoint_tamper_never_passes_s1(seed):
+    rng = random.Random(seed)
+    b, f = fixture()
+    cp = deepcopy(f["checkpoint"])
+    payload = cp["payload"]
+    choice = rng.choice((
+        "goal_id", "contract_hash", "state_hash", "state_version",
+        "evidence_root", "candidate_hash", "loop_root", "final_n2_receipt_hash",
+    ))
+    if choice == "state_version":
+        payload[choice] += rng.randint(1, 20)
+    elif choice == "goal_id":
+        payload[choice] = "g_" + rand_text(rng, 8)
+    else:
+        payload[choice] = rand_text(rng, 64)
+    s1 = r.s1_verify(
+        b,
+        checkpoint=cp,
+        transition_receipt=f["transition"],
+        final_n2_receipt=f["final_n2"],
+        current_state=f["state"],
+        policy=f["policy"],
+    )
+    assert b.verify(s1, issuer="S1", kind="integrity")["status"] == "BLOCK"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_readonly_n1_cannot_change_protected_output(seed):
+    rng = random.Random(seed)
+    b, f = fixture()
+    text = rand_text(rng, rng.randint(0, 60))
+    out = r.render_readonly(b, terminal_receipt=f["s2"], presentation={"text": text})
+    terminal = b.verify(f["s2"], issuer="S2", kind="terminal")
+    assert out["terminal_status"] == terminal["terminal_status"]
+    assert out["action"] == terminal["action"]
+    assert out["action_hash"] == terminal["action_hash"]
+    assert out["state_version"] == terminal["state_version"]
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_untrusted_global_anchor_cannot_create_global_pass(seed):
+    rng = random.Random(seed)
+    b = boundary()
+    state = {"version": 7, "balance": 100, "verified_recipients": ["alice"]}
+    policy = {"schema_version": 1, "contract_id": "transfer-v1", "max_amount": 80, "allowed_actions": ["transfer"]}
+
+    mode = rng.choice(("not_independent", "wrong_scope", "wrong_version", "unknown"))
+    anchor = {"status": "PASS", "independent": True, "scope": ["goal"], "state_version": 7}
+    if mode == "not_independent":
+        anchor["independent"] = False
+    elif mode == "wrong_scope":
+        anchor["scope"] = ["other"]
+    elif mode == "wrong_version":
+        anchor["state_version"] = 8 + rng.randint(0, 20)
+    else:
+        anchor["status"] = "UNKNOWN"
+
+    tr = b.make_transition_envelope(
+        goal_id="pay-alice",
+        state=state,
+        policy=policy,
+        evidence_root="evidence-root",
+        previous_receipt_hash="previous-root",
+        global_anchor=anchor,
+    )
+    initial = {
+        "goal_id": "pay-alice",
+        "state_version": 7,
+        "action": {"type": "transfer", "recipient": "alice", "amount": 40, "memo": "x"},
+    }
+    loop = r.n1_n2_loop(
+        b,
+        initial_candidate=initial,
+        exchanges=[{"n2": {"round_id": 0, "decision": "CLEAR", "issues": []}}],
+        transition_receipt=tr,
+    )
+    fn2 = r.final_n2(
+        b,
+        loop_result=loop,
+        review={"round_id": 99, "decision": "CLEAR", "issues": []},
+        transition_receipt=tr,
+    )
+    cp = r.make_checkpoint(b, transition_receipt=tr, loop_result=loop, final_n2_receipt=fn2)
+    s1 = r.s1_verify(
+        b, checkpoint=cp, transition_receipt=tr, final_n2_receipt=fn2,
+        current_state=state, policy=policy
+    )
+    s2 = r.s2_decide(
+        b, checkpoint=cp, s1_receipt=s1, current_state=state, policy=policy,
+        action_nonce="nonce_" + rand_text(rng, 8)
+    )
+    terminal = b.verify(s2, issuer="S2", kind="terminal")
+    assert terminal["contract_status"] == "PASS"
+    assert terminal["terminal_status"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_status_precedence_never_allows_pass_to_override_stronger_state(seed):
+    rng = random.Random(seed)
+    statuses = [rng.choice(("PASS", "UNKNOWN", "BLOCK", "CONFLICT")) for _ in range(rng.randint(1, 8))]
+    expected = max(statuses, key=lambda s: r.STATUS_ORDER[s])
+    assert r.worst_status(*statuses) == expected
+    if any(s != "PASS" for s in statuses):
+        assert r.worst_status(*statuses) != "PASS"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_loop_is_bounded_and_repeated_candidate_does_not_unlock_pass(seed):
+    rng = random.Random(seed)
+    b, f = fixture()
+    initial = deepcopy(f["initial"])
+    exchanges = []
+    for i in range(rng.randint(1, 12)):
+        exchanges.append({
+            "n2": {"round_id": i, "decision": "CHALLENGE", "issues": ["issue"]},
+            "n1_revision": deepcopy(initial),
+        })
+    out = r.n1_n2_loop(
+        b,
+        initial_candidate=initial,
+        exchanges=exchanges,
+        transition_receipt=f["transition"],
+        max_rounds=rng.randint(1, 4),
+    )
+    assert out["loop_status"] == "UNKNOWN"
+    assert len(out["receipts"]) <= 1
+
+
+def test_property_canonical_object_order_invariant_for_many_objects():
+    rng = random.Random(20261004)
+    for _ in range(500):
+        items = [(f"k{i}", rng.randint(-100000, 100000)) for i in range(rng.randint(1, 20))]
+        a = dict(items)
+        rng.shuffle(items)
+        b = dict(items)
+        assert r.canonical(a) == r.canonical(b)
+        assert r.digest(a) == r.digest(b)
+
+
+def test_property_bool_never_aliases_integer_hash():
+    for key in ("x", "value", "status", "flag"):
+        assert r.digest({key: True}) != r.digest({key: 1})
+        assert r.digest({key: False}) != r.digest({key: 0})
