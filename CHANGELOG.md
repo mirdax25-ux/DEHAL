@@ -1,5 +1,41 @@
 # Changelog
 
+## v2.1.2 — Integrated boundary and quorum hardening
+
+Continues the merged MAIN + v2 CORE + RAW PIPELINE + INGESTION + GUARD LOOP
+integration on `integration/bodulskihal-benchmark-20261004`. JSON schema stays 3;
+the live Floot/native transport is outside this repository change.
+
+### Failure → Evolution
+
+- **BH-TYPE-AUTHORITY-003**
+  - FAILURE MODE: a string or other non-enum authority could promote an executor-declared observation to FACT/APPROVE.
+  - ROOT CAUSE: enum identity comparison assumed callers obeyed Python annotations.
+  - GUARDRAIL: require a real `TypeAuthority` before clause typing.
+  - REGRESSION TEST: malformed authority inputs through typing and ingestion verification, with valid executor/trusted-authority controls.
+  - VERSION CHANGE: package/algorithm 2.1.1 → 2.1.2.
+- **BH-INGESTION-GROUP-003**
+  - FAILURE MODE: ingestion rejected the core's `independence_group` evidence field.
+  - ROOT CAUSE: the earlier adapter addition did not update the ingestion allowlist and constructor.
+  - GUARDRAIL: validate and preserve optional independence metadata through ingestion.
+  - REGRESSION TEST: valid groups survive to receipts; malformed groups fail; omitted groups remain compatible.
+  - VERSION CHANGE: 2.1.2 ingestion contract correction, schema remains 3.
+- **BH-INDEPENDENCE-003**
+  - FAILURE MODE: adding different group labels or optional references split a known source into independent quorum votes.
+  - ROOT CAUSE: choosing one priority identity discarded overlapping provenance identifiers.
+  - GUARDRAIL: count connected groups sharing source IDs, references or group labels; metadata can only merge known identities.
+  - REGRESSION TEST: `test_independence_alias_regressions.py` covers conflicting labels, partial metadata, source aliases, transitive overlap, all input orders and separate namespaces.
+  - VERSION CHANGE: 2.1.2 quorum semantics tightened.
+- **BH-LIFECYCLE-BOOL-003**
+  - FAILURE MODE: truthy strings/integers could satisfy freeze checkpoint or freeze/reopen human approval gates.
+  - ROOT CAUSE: lifecycle transitions used truthiness and receipt coercion instead of validating boolean types.
+  - GUARDRAIL: reject non-booleans before transition dispatch, including idempotent paths.
+  - REGRESSION TEST: `test_lifecycle_runtime_types.py` exercises invalid inputs across ACTIVE/FROZEN paths and preserves boolean behavior.
+  - VERSION CHANGE: 2.1.2 lifecycle input validation correction.
+
+Validation records belong to the tested commit's PR/CI and external test artifacts;
+this entry alone is not proof of a passed run or live deployment.
+
 ## v2.1.1 ? Source-independence hardening
 
 ### Fixed

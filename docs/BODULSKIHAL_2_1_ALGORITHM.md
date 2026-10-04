@@ -102,7 +102,12 @@ ACTION_STATE zahtijeva:
 
 ### C7. Source-independence gate
 
-Quorum se ra?una po jedinstvenom identitetu neovisnosti, ne po broju evidence objekata. Redoslijed je: eksplicitni `independence_group`, zatim `source_ref`, pa `source_id`. Dva aliasa istog izvora ili dvije observacije iste grupe nisu dva neovisna izvora.
+Quorum se računa po povezanim grupama dokaza, ne po broju evidence objekata.
+Zajednički `source_id`, `source_ref` ili `independence_group` povezuju dokaze,
+uključujući tranzitivno preklapanje. Dodatni metapodaci mogu spojiti identitete,
+ali ne mogu razdvojiti već poznat izvor na više glasova. Vrijednosti se uspoređuju
+nakon uklanjanja rubnih razmaka, unutar istog polja. Ovo ne autentificira vanjski
+izvor i ne podrazumijeva normalizaciju različitih URL-ova.
 
 ### C8. Unknown gate
 

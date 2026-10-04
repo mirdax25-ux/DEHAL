@@ -25,6 +25,11 @@ def _non_empty(value: str, name: str) -> str:
     return value.strip()
 
 
+def _validate_bool(value: bool, name: str) -> None:
+    if type(value) is not bool:
+        raise TypeError(f"{name} must be bool")
+
+
 def _receipt(
     *,
     project_id: str,
@@ -68,6 +73,8 @@ def freeze_project(
     project_id = _non_empty(project_id, "project_id")
     checkpoint_digest = _non_empty(checkpoint_digest, "checkpoint_digest")
     policy_version = _non_empty(policy_version, "policy_version")
+    _validate_bool(checkpoint_verified, "checkpoint_verified")
+    _validate_bool(human_approved, "human_approved")
 
     if current_state is ProjectState.FROZEN:
         if current_checkpoint_digest == checkpoint_digest:
@@ -211,6 +218,7 @@ def reopen_project(
     checkpoint_digest = _non_empty(checkpoint_digest, "checkpoint_digest")
     reopen_reason = _non_empty(reopen_reason, "reopen_reason")
     policy_version = _non_empty(policy_version, "policy_version")
+    _validate_bool(human_approved, "human_approved")
 
     if current_state is not ProjectState.FROZEN:
         reason = "invalid_reopen_transition"
