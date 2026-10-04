@@ -115,3 +115,48 @@ def test_json_adapter_preserves_independence_group():
     assert result["classification"] == "FACT"
     assert result["verdict"] == "ESCALATE"
     assert result["receipt"]["gates"]["independent_supporting_group_count"] == 1
+
+
+def test_same_content_hash_cannot_count_as_independent_sources():
+    common = dict(
+        supports=True,
+        observed_at=T0,
+        directness=Directness.DIRECT,
+        source_role=SourceRole.EXTERNAL,
+        origin=EvidenceOrigin.EXTERNAL_SOURCE,
+        authority_scope=AuthorityScope.EXTERNAL_FACT,
+        content_sha256="a" * 64,
+    )
+    result = verify_claim(
+        Claim(
+            "c-same-content",
+            "Medium-risk fact",
+            ClaimType.OBSERVATION,
+            risk=RiskLevel.MEDIUM,
+        ),
+        [
+            Evidence(
+                source_id="source-a",
+                evidence_id="same-content-e1",
+                source_ref="https://a.example/item",
+                independence_group="origin-a",
+                **common,
+            ),
+            Evidence(
+                source_id="source-b",
+                evidence_id="same-content-e2",
+                source_ref="https://b.example/item",
+                independence_group="origin-b",
+                **common,
+            ),
+        ],
+        policy=Policy(
+            version="materiality-v1",
+            max_age_seconds=300,
+            medium_risk_min_independent_sources=2,
+        ),
+        evaluation_time=T0,
+    )
+
+    assert result.verdict is Verdict.ESCALATE
+    assert result.receipt["gates"]["independent_supporting_group_count"] == 1
