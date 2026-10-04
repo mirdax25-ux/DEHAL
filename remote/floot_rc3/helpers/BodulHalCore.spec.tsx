@@ -133,12 +133,14 @@ describe("BodulHal 1.2.0-rc.3 remote contract", () => {
     expect(r.reason).toBe("action_final_state_boundary_required");
   });
 
-  it("guard_claim approves action_state only with post-action evidence", () => {
+  it("guard_claim fails closed on caller-only post-action timestamps", () => {
     const action = claim({kind:"action_state",after:"2026-09-27T16:29:50Z"});
     const r = guardClaim({ claim:action, evidence:[ev()], self_check:selfCheck() }, now);
     expect(r.stage).toBe("verification");
-    expect(r.classification).toBe("FACT");
-    expect(r.status).toBe("APPROVE");
+    expect(r.approved).toBe(false);
+    expect(r.classification).toBe("UNKNOWN");
+    expect(r.status).toBe("ESCALATE");
+    expect(r.reason).toBe("trusted_post_action_evidence_required");
   });
 
   it("guard_claim escalates high-risk fact without human approval", () => {
