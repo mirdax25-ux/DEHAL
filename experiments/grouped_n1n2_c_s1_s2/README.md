@@ -39,11 +39,11 @@ PASS, UNKNOWN, BLOCK, and CONFLICT are separate terminal states. A contract PASS
 Run from repository root:
 
 ```text
-python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py
+python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
 python -m compileall -q experiments/grouped_n1n2_c_s1_s2
 ```
 
-The preparation environment ran **92 passing tests** against the exact prototype code before publication. Hosted GitHub CI and the repository's full existing suite are not claimed until separately observed.
+Experiment version **0.1.1** currently has **418 passing tests** in the local isolated environment: 96 targeted/regression tests plus 322 deterministic fuzz/property tests. Hosted GitHub CI and the repository's full existing suite are not claimed until separately observed.
 
 ## Explicit limitations
 

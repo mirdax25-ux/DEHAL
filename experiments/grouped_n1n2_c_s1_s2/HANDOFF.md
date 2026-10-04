@@ -10,9 +10,11 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
+Current experiment version: **0.1.1**
+
 Preparation environment:
-- python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py
-  - **92 passed**
+- python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
+  - **418 passed** = 96 targeted/regression + 322 deterministic fuzz/property
 - python -m compileall -q experiments/grouped_n1n2_c_s1_s2
   - exit code 0
 
@@ -38,9 +40,12 @@ The repository's full pre-existing test suite and hosted GitHub Actions are not 
 
 S1 initially treated a stale global anchor as an integrity failure and returned BLOCK. That mixed S1 and S2 responsibilities. S1 now limits itself to integrity/provenance/state binding; S2 turns a stale/insufficient global anchor into UNKNOWN. The regression is included in test_global_goal_never_inferred_from_contract_pass.
 
+## Confirmed second failure fixed
+
+The initial fuzz-expanded attack found that loop CONFLICT/UNKNOWN and final N2 CHALLENGE/UNKNOWN could be recorded in C but silently disappear before S2, producing PASS. Version 0.1.1 makes both loop status and final-N2 status inputs to S2's terminal lattice. Regression tests cover all four reproduced paths.
+
 ## Next attacks
 
-- Property/fuzz generation over receipt/canonicalization schemas.
 - Common-mode specification errors across S1/S2.
 - Independence/authority of global anchors.
 - Multi-process or external signer boundary for receipt provenance.

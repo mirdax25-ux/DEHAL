@@ -18,7 +18,7 @@ import math
 import re
 from typing import Any
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -323,6 +323,8 @@ def make_checkpoint(
         "loop_status": loop_result["loop_status"],
         "loop_root": loop_result["loop_root"],
         "final_n2_receipt_hash": digest(final_n2_receipt),
+        "final_n2_decision": n2["decision"],
+        "final_n2_issues": list(n2["issues"]),
         "global_anchor": deepcopy(transition["global_anchor"]),
     }
     return boundary.issue(issuer="C", kind="checkpoint", payload=payload)
@@ -380,6 +382,16 @@ def _global_status(anchor: dict[str, Any], state_version: int) -> str:
     return "PASS" if anchor["status"] == "PASS" else "UNKNOWN"
 
 
+def _n2_decision_status(decision: str) -> str:
+    if decision == "CLEAR":
+        return "PASS"
+    if decision == "UNKNOWN":
+        return "UNKNOWN"
+    if decision == "CHALLENGE":
+        return "CONFLICT"
+    raise ProtocolError("invalid_n2_decision")
+
+
 def s2_decide(
     boundary: TrustedBoundary,
     *,
@@ -399,12 +411,18 @@ def s2_decide(
         if s1["checkpoint_hash"] != digest(checkpoint):
             raise ProtocolError("s1_wrong_checkpoint")
         integrity = s1["status"]
+        loop_status = cp["loop_status"]
+        if loop_status not in ("PASS", "UNKNOWN", "CONFLICT"):
+            raise ProtocolError("invalid_loop_status")
+        final_n2_status = _n2_decision_status(cp["final_n2_decision"])
         contract = _contract_status(cp["candidate"], current_state, policy)
         global_status = _global_status(cp["global_anchor"], current_state["version"])
-        terminal = worst_status(integrity, contract, global_status)
+        terminal = worst_status(integrity, loop_status, final_n2_status, contract, global_status)
         payload = {
             "terminal_status": terminal,
             "integrity_status": integrity,
+            "loop_status": loop_status,
+            "final_n2_status": final_n2_status,
             "contract_status": contract,
             "global_goal_status": global_status,
             "checkpoint_hash": digest(checkpoint),
@@ -419,6 +437,8 @@ def s2_decide(
         payload = {
             "terminal_status": "BLOCK",
             "integrity_status": "BLOCK",
+            "loop_status": "UNKNOWN",
+            "final_n2_status": "UNKNOWN",
             "contract_status": "BLOCK",
             "global_goal_status": "UNKNOWN",
             "checkpoint_hash": digest(checkpoint) if type(checkpoint) is dict else None,

@@ -348,7 +348,7 @@ def test_s1_receipt_cannot_be_reused_for_other_checkpoint():
     assert boundary.verify(s2, issuer="S2", kind="terminal")["terminal_status"] == "BLOCK"
 
 
-def test_final_n2_is_advisory_not_truth_oracle():
+def test_final_n2_challenge_reaches_terminal_conflict():
     boundary, f = fx()
     loop=f["loop"]
     n2=final_n2(
@@ -365,7 +365,62 @@ def test_final_n2_is_advisory_not_truth_oracle():
         boundary,checkpoint=cp,s1_receipt=s1,
         current_state=f["state"],policy=f["policy"],action_nonce="n2-advisory"
     )
-    assert boundary.verify(s2,issuer="S2",kind="terminal")["terminal_status"] == "PASS"
+    payload = boundary.verify(s2,issuer="S2",kind="terminal")
+    assert payload["final_n2_status"] == "CONFLICT"
+    assert payload["terminal_status"] == "CONFLICT"
+
+
+@pytest.mark.parametrize(
+    "loop_exchanges,final_decision,expected_loop,expected_final,expected_terminal",
+    [
+        ([{"n2":{"round_id":0,"decision":"CHALLENGE","issues":["x"]}}], "CLEAR", "CONFLICT", "PASS", "CONFLICT"),
+        ([{"n2":{"round_id":0,"decision":"UNKNOWN","issues":["missing"]}}], "CLEAR", "UNKNOWN", "PASS", "UNKNOWN"),
+        ([{"n2":{"round_id":0,"decision":"CLEAR","issues":[]}}], "CHALLENGE", "PASS", "CONFLICT", "CONFLICT"),
+        ([{"n2":{"round_id":0,"decision":"CLEAR","issues":[]}}], "UNKNOWN", "PASS", "UNKNOWN", "UNKNOWN"),
+    ],
+)
+def test_loop_and_final_n2_statuses_reach_s2(
+    loop_exchanges, final_decision, expected_loop, expected_final, expected_terminal
+):
+    boundary, f = fx()
+    loop = n1_n2_loop(
+        boundary,
+        initial_candidate=f["initial"],
+        exchanges=loop_exchanges,
+        transition_receipt=f["transition"],
+    )
+    n2 = final_n2(
+        boundary,
+        loop_result=loop,
+        review={"round_id":99,"decision":final_decision,"issues":["regression"] if final_decision != "CLEAR" else []},
+        transition_receipt=f["transition"],
+    )
+    cp = make_checkpoint(
+        boundary,
+        transition_receipt=f["transition"],
+        loop_result=loop,
+        final_n2_receipt=n2,
+    )
+    s1 = s1_verify(
+        boundary,
+        checkpoint=cp,
+        transition_receipt=f["transition"],
+        final_n2_receipt=n2,
+        current_state=f["state"],
+        policy=f["policy"],
+    )
+    s2 = s2_decide(
+        boundary,
+        checkpoint=cp,
+        s1_receipt=s1,
+        current_state=f["state"],
+        policy=f["policy"],
+        action_nonce="loop-n2-regression",
+    )
+    payload = boundary.verify(s2, issuer="S2", kind="terminal")
+    assert payload["loop_status"] == expected_loop
+    assert payload["final_n2_status"] == expected_final
+    assert payload["terminal_status"] == expected_terminal
 
 
 def test_canonical_is_stable_for_object_key_order():
