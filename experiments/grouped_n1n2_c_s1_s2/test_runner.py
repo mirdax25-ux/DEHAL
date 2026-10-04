@@ -845,3 +845,22 @@ def test_common_mode_wrong_spec_remains_explicit_trust_boundary():
     assert f["output"]["terminal_status"] == "PASS"
     assert f["output"]["global_truth_certified"] is False
     assert f["output"]["epistemic_scope"] == "authenticated_inputs_and_declared_requirements_only"
+
+
+@pytest.mark.xfail(strict=True, reason="F12 OPEN: bounded PASS still authorizes side effect without separate action authority")
+def test_bounded_pass_without_global_truth_still_executes_real_action_red(tmp_path):
+    boundary, f = fx()
+    assert f["output"]["terminal_status"] == "PASS"
+    assert f["output"]["global_truth_certified"] is False
+    assert f["output"]["epistemic_scope"] == "authenticated_inputs_and_declared_requirements_only"
+    # Safety target for this RED attack: a non-globally-certified decision must
+    # not itself be sufficient authority for an irreversible side effect.
+    result = execute(
+        boundary,
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    )
+    assert result == "BLOCK"

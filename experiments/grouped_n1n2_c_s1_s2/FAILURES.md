@@ -148,3 +148,16 @@ A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact
 **Version change:** experiment 0.1.7 -> **0.1.8**.
 
 **Residual:** semantic completeness of the trusted specification remains UNKNOWN unless independently grounded outside the same trust chain.
+
+
+## F12 — bounded epistemic PASS can still authorize a real side effect
+
+**Failure mode:** After 0.1.8 correctly marks terminal PASS as bounded and `global_truth_certified=false`, the executor still returns EXECUTED for that receipt. A semantically incomplete specification can therefore remain bounded in prose/metadata yet still cause an irreversible action.
+
+**Root cause:** Epistemic certification and action authorization are conflated at the execution boundary. The executor treats S2 terminal PASS as sufficient capability to perform the side effect.
+
+**Guardrail candidate:** Do not simply block every bounded PASS. Introduce a separately grounded, narrowly scoped action-authority/capability receipt bound to goal_id, exact action hash, state hash/version, policy hash and execution token. Its authority must not be derived solely from the same specification being checked.
+
+**Regression test:** `test_bounded_pass_without_global_truth_still_executes_real_action_red` reproduces EXECUTED where the safety target is BLOCK. It is strict xfail while F12 remains open so the vulnerability cannot silently disappear from the suite.
+
+**Version change:** none yet. 0.1.8 remains current; F12 is OPEN and no fix/READY claim is allowed.
