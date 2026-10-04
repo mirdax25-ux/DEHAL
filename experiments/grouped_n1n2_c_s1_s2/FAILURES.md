@@ -60,6 +60,35 @@
 
 **Version change:** experiment 0.1.3 -> **0.1.4**.
 
+
+## F6 — policy drift after S2 could still execute
+
+**Failure mode:** S2 could certify an action under policy P1, then policy could change to stricter P2 before execution while state/action remained unchanged. The executor checked state hash, action hash and nonce but did not receive or verify the current policy, so the previously certified action still returned EXECUTED even when P2 would BLOCK it.
+
+**Root cause:** contract_hash was present in the S2 terminal receipt but was not enforced at the action boundary. This was a policy TOCTOU gap between decision and execution.
+
+**Guardrail:** execute now requires the current policy, validates it, requires its canonical hash to equal the S2 contract_hash, and re-evaluates the action against the current state/policy before nonce consumption.
+
+**Regression test:** test_executor_rejects_policy_drift_after_s2.
+
+**Version change:** experiment 0.1.4 -> **0.1.5**.
+
+## F7 — in-memory nonce state allowed replay after boundary restart
+
+**Failure mode:** An S2-certified action executed once, then a new TrustedBoundary created with the same trust keys accepted the same old terminal receipt and executed it again because the old consumed_tokens set existed only in the previous process object.
+
+**Root cause:** Replay protection was process-local rather than durable. Cryptographic receipt validity survived restart, but nonce-consumption state did not.
+
+**Guardrail:** The executor now requires FileNonceLedger. Nonce consumption uses atomic exclusive file creation on a trusted local filesystem, so a new boundary/process using the same ledger directory observes the prior consumption. Missing/wrong ledger input fails closed.
+
+**Regression tests:** test_file_nonce_ledger_blocks_replay_after_boundary_restart and test_executor_fails_closed_without_durable_ledger.
+
+**Version change:** remains **0.1.5** in the same execution-boundary hardening batch.
+
+## Known unresolved execution boundary — external side-effect atomicity
+
+The file ledger provides local at-most-once replay protection across process restart, but it is not a distributed transaction. A real external side effect and nonce-ledger commit cannot be made exactly-once by this prototype alone. Production integration must use an idempotent external operation or a transactionally coupled execution/idempotency store.
+
 ## Known unresolved boundary — wrong specification
 
 A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact-action executor can still enforce a semantically wrong/incomplete policy if the trusted starting specification itself is wrong. This is not classified as fixed. The architecture must preserve bounded claims and use UNKNOWN when independent semantic grounding is unavailable.

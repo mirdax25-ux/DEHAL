@@ -10,15 +10,17 @@ prototype provenance mechanism, not production key management.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import hashlib
 import hmac
 import json
 import math
+import os
+from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -72,6 +74,54 @@ def canonical(value: Any) -> bytes:
 
 def digest(value: Any) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
+
+
+@dataclass(frozen=True)
+class FileNonceLedger:
+    """Trusted local at-most-once nonce ledger with cross-process persistence.
+
+    Exclusive file creation makes consumption atomic on one trusted filesystem.
+    It is not a distributed transaction and cannot by itself guarantee that an
+    external side effect and nonce consumption commit atomically.
+    """
+
+    root: Path | str
+
+    def __post_init__(self) -> None:
+        path = Path(self.root)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            path = path.resolve(strict=True)
+        except OSError as exc:
+            raise ProtocolError("ledger_unavailable") from exc
+        if not path.is_dir():
+            raise ProtocolError("ledger_not_directory")
+        object.__setattr__(self, "root", path)
+
+    def consume(self, nonce: str) -> bool:
+        if not _name(nonce):
+            raise ProtocolError("invalid_action_nonce")
+        name = hashlib.sha256(nonce.encode("utf-8")).hexdigest() + ".nonce"
+        path = self.root / name
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        try:
+            fd = os.open(path, flags, 0o600)
+        except FileExistsError:
+            return False
+        except OSError as exc:
+            raise ProtocolError("ledger_unavailable") from exc
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(b"consumed\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError as exc:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise ProtocolError("ledger_write_failed") from exc
+        return True
 
 
 def _strict_keys(value: Any, keys: tuple[str, ...], *, optional: tuple[str, ...] = ()):
@@ -145,7 +195,6 @@ class TrustedBoundary:
     secret: bytes
     anchor_secret: bytes
     evidence_secret: bytes
-    consumed_tokens: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         if type(self.secret) is not bytes or not self.secret:
@@ -695,11 +744,22 @@ def render_readonly(boundary: TrustedBoundary, *, terminal_receipt: dict[str, An
     }
 
 
-def execute(boundary: TrustedBoundary, *, output: dict[str, Any], current_state: dict[str, Any], action: dict[str, Any]) -> str:
+def execute(
+    boundary: TrustedBoundary,
+    *,
+    output: dict[str, Any],
+    current_state: dict[str, Any],
+    current_policy: dict[str, Any],
+    action: dict[str, Any],
+    nonce_ledger: FileNonceLedger,
+) -> str:
     try:
         _strict_keys(output, ("terminal_status", "action", "action_hash", "state_version", "terminal_receipt", "explanation"))
         terminal = boundary.verify(output["terminal_receipt"], issuer="S2", kind="terminal")
         validate_state(current_state)
+        validate_policy(current_policy)
+        if not isinstance(nonce_ledger, FileNonceLedger):
+            return "BLOCK"
         if output["terminal_status"] != terminal["terminal_status"] or terminal["terminal_status"] != "PASS":
             return "BLOCK"
         if output["action_hash"] != terminal["action_hash"] or digest(action) != terminal["action_hash"]:
@@ -708,12 +768,15 @@ def execute(boundary: TrustedBoundary, *, output: dict[str, Any], current_state:
             return "BLOCK"
         if output["state_version"] != current_state["version"] or terminal["state_hash"] != digest(current_state):
             return "BLOCK"
+        if terminal["contract_hash"] != digest(current_policy):
+            return "BLOCK"
+        if _contract_status({"action": action}, current_state, current_policy) != "PASS":
+            return "BLOCK"
         nonce = terminal["action_nonce"]
-        if nonce in boundary.consumed_tokens:
+        if not nonce_ledger.consume(nonce):
             return "NOOP"
-        boundary.consumed_tokens.add(nonce)
         return "EXECUTED"
-    except (ProtocolError, KeyError, TypeError, ValueError, OverflowError):
+    except (ProtocolError, KeyError, TypeError, ValueError, OverflowError, OSError):
         return "BLOCK"
 
 

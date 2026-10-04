@@ -31,7 +31,7 @@ def rand_text(rng, n=10):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_fuzz_executor_rejects_random_action_mutation(seed):
+def test_fuzz_executor_rejects_random_action_mutation(seed, tmp_path):
     rng = random.Random(seed)
     b, f = fixture()
     action = deepcopy(f["output"]["action"])
@@ -44,11 +44,11 @@ def test_fuzz_executor_rejects_random_action_mutation(seed):
         action["type"] = "a_" + rand_text(rng, 8)
     else:
         action["memo"] = "m_" + rand_text(rng, 12)
-    assert r.execute(b, output=f["output"], current_state=f["state"], action=action) == "BLOCK"
+    assert r.execute(b, output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_fuzz_executor_rejects_random_state_mutation(seed):
+def test_fuzz_executor_rejects_random_state_mutation(seed, tmp_path):
     rng = random.Random(seed)
     b, f = fixture()
     state = deepcopy(f["state"])
@@ -59,11 +59,11 @@ def test_fuzz_executor_rejects_random_state_mutation(seed):
         state["balance"] += rng.randint(1, 100)
     else:
         state["verified_recipients"] = ["alice", "u_" + rand_text(rng, 8)]
-    assert r.execute(b, output=f["output"], current_state=state, action=f["output"]["action"]) == "BLOCK"
+    assert r.execute(b, output=f["output"], current_state=state, current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_fuzz_terminal_receipt_tamper_never_executes(seed):
+def test_fuzz_terminal_receipt_tamper_never_executes(seed, tmp_path):
     rng = random.Random(seed)
     b, f = fixture()
     out = deepcopy(f["output"])
@@ -87,7 +87,7 @@ def test_fuzz_terminal_receipt_tamper_never_executes(seed):
         receipt["payload"]["state_version"] += rng.randint(1, 20)
     elif choice == "action_nonce":
         receipt["payload"]["action_nonce"] = "nonce_" + rand_text(rng, 10)
-    assert r.execute(b, output=out, current_state=f["state"], action=f["output"]["action"]) == "BLOCK"
+    assert r.execute(b, output=out, current_state=f["state"], current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
