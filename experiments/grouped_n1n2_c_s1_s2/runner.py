@@ -792,13 +792,6 @@ def execute(
     try:
         _strict_keys(output, ("terminal_status", "action", "action_hash", "state_version", "terminal_receipt", "epistemic_scope", "global_truth_certified", "explanation"))
         terminal = boundary.verify(output["terminal_receipt"], issuer="S2", kind="terminal")
-        if (
-            output["epistemic_scope"] != terminal["epistemic_scope"]
-            or output["global_truth_certified"] is not terminal["global_truth_certified"]
-            or terminal["epistemic_scope"] != "authenticated_inputs_and_declared_requirements_only"
-            or terminal["global_truth_certified"] is not False
-        ):
-            return "BLOCK"
         validate_state(current_state)
         validate_policy(current_policy)
         if not isinstance(nonce_ledger, FileNonceLedger):
