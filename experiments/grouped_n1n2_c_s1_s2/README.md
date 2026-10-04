@@ -22,7 +22,7 @@ The experiment does **not** call an LLM and does not claim universal correctness
 
 - Group-transition data are issued by a deterministic boundary and bind goal, contract, state hash/version, evidence root, prior receipt and global-anchor metadata.
 - S1 PASS requires a separate evidence-authority receipt bound to `evidence_root + state_version + contract_hash`. A raw evidence-root label without that receipt yields UNKNOWN.
-- Global-goal PASS requires a separate anchor receipt bound to a distinct anchor trust key. A caller-supplied `independent=true` flag without that receipt is only untrusted context and yields UNKNOWN.
+- Global-goal PASS requires a separate anchor receipt bound to a distinct anchor trust key. The authenticated anchor is also bound to the exact goal identity and contract hash, preventing replay across goals or policy revisions. A caller-supplied `independent=true` flag without that receipt is only untrusted context and yields UNKNOWN.
 - N1/N2 cannot author trusted PASS receipts.
 - Each N2 review is bound to the exact candidate and parent receipt. Its receipt proves what N2 said, **not that N2 was correct**.
 - The N1<->N2 loop stops on CLEAR, UNKNOWN, unresolved CHALLENGE, repeated candidate, or max-round budget.
@@ -45,7 +45,7 @@ python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/
 python -m compileall -q experiments/grouped_n1n2_c_s1_s2
 ```
 
-Experiment version **0.1.6** currently has **438 passing experiment tests** in the local isolated environment: 116 targeted/regression tests plus 322 deterministic fuzz/property tests. The combined existing repository suite plus this experiment has **733 passing tests** locally. Hosted GitHub CI is not claimed until separately observed.
+Experiment version **0.1.7** currently has **441 passing experiment tests** in the local isolated environment: 118 targeted/regression tests plus 323 deterministic fuzz/property tests. The combined existing repository suite plus this experiment has **736 passing tests** locally. Hosted GitHub CI is not claimed until separately observed.
 
 ## Explicit limitations
 

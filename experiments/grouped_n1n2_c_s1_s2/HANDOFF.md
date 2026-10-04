@@ -10,13 +10,14 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
-Current experiment version: **0.1.6**
+Current experiment version: **0.1.7**
 
 Preparation environment:
-- python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
-  - **438 passed** = 116 targeted/regression + 322 deterministic fuzz/property
+- python -m pytest experiments/grouped_n1n2_c_s1_s2 --tb=short
+  - **441 passed** = 118 targeted/regression + 323 deterministic fuzz/property
 - python -m compileall -q experiments/grouped_n1n2_c_s1_s2
   - exit code 0
+- multiprocess nonce race: 16 spawned processes attempted one token; exactly 1 consumed it and 15 were rejected
 
 Post-action verification of the actual GitHub branch:
 - fresh clone of experiment/grouped-n1n2-c-s1-s2-20261004 into a temporary Windows directory
@@ -24,7 +25,7 @@ Post-action verification of the actual GitHub branch:
 - pytest on the checked-out experiment: **exit code 0**
 - compileall on the checked-out experiment: **exit code 0**
 
-The combined pre-existing repository tests plus this experiment were also run locally: **733 passed**. Hosted GitHub Actions are not claimed here.
+The combined pre-existing repository tests plus this experiment were also run locally after the new race regression: **736 passed**. One immediately prior combined invocation produced a large transient failure set, but two fresh reruns of the same combined scope passed; the root cause of that transient is UNKNOWN, so it is recorded as a stability warning rather than silently discarded. Hosted GitHub Actions are not claimed here.
 
 ## Critical invariants
 
@@ -69,6 +70,11 @@ Nonce consumption was previously stored only inside the current TrustedBoundary 
 ## Confirmed eighth failure fixed
 
 The durable ledger could still be bypassed because action_nonce was an S2 caller input. Re-running S2 for the same checkpoint with a fresh nonce produced a second valid terminal receipt and the same action executed again. Version 0.1.6 removes caller nonce control and derives a stable execution token from the trusted goal_id. Re-certifying the same goal now reuses the same token and becomes NOOP after the first execution.
+
+
+## Confirmed tenth failure fixed
+
+A valid authenticated global-anchor receipt could be replayed for a different goal or a changed policy as long as the state version still matched. Version 0.1.7 binds the anchor payload to the exact goal identity and contract hash, and the transition plus S2 independently enforce those bindings. Replaying the old anchor across either dimension now fails closed.
 
 ## Stable-operation identity assumption
 

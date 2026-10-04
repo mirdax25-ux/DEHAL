@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -281,6 +281,8 @@ class TrustedBoundary:
         validate_state(state)
         validate_policy(policy)
         validate_anchor(global_anchor)
+        if global_anchor["goal_id"] != goal_id or global_anchor["contract_hash"] != digest(policy):
+            raise ProtocolError("anchor_context_mismatch")
         anchor_verified = False
         if global_anchor_receipt is not None:
             verified_anchor = self.verify_global_anchor(global_anchor_receipt)
@@ -345,7 +347,7 @@ def validate_policy(policy: Any):
 
 
 def validate_anchor(anchor: Any):
-    _strict_keys(anchor, ("status", "independent", "scope", "state_version"))
+    _strict_keys(anchor, ("status", "independent", "scope", "state_version", "goal_id", "contract_hash"))
     if anchor["status"] not in ("PASS", "UNKNOWN", "CONFLICT"):
         raise ProtocolError("invalid_anchor_status")
     if type(anchor["independent"]) is not bool:
@@ -354,6 +356,10 @@ def validate_anchor(anchor: Any):
         raise ProtocolError("invalid_anchor_scope")
     if type(anchor["state_version"]) is not int or anchor["state_version"] < 0:
         raise ProtocolError("invalid_anchor_state_version")
+    if not _name(anchor["goal_id"]):
+        raise ProtocolError("invalid_anchor_goal")
+    if type(anchor["contract_hash"]) is not str or re.fullmatch(r"[a-f0-9]{64}", anchor["contract_hash"]) is None:
+        raise ProtocolError("invalid_anchor_contract_hash")
 
 
 def validate_candidate(candidate: Any):
@@ -639,13 +645,26 @@ def _contract_status(candidate: dict[str, Any], state: dict[str, Any], policy: d
     return "PASS"
 
 
-def _global_status(anchor: dict[str, Any], state_version: int, *, provenance_verified: bool) -> str:
+def _global_status(
+    anchor: dict[str, Any],
+    state_version: int,
+    *,
+    provenance_verified: bool,
+    goal_id: str,
+    contract_hash: str,
+) -> str:
     validate_anchor(anchor)
     if not provenance_verified:
         return "UNKNOWN"
     if anchor["status"] == "CONFLICT":
         return "CONFLICT"
-    if not anchor["independent"] or "goal" not in anchor["scope"] or anchor["state_version"] != state_version:
+    if (
+        not anchor["independent"]
+        or "goal" not in anchor["scope"]
+        or anchor["state_version"] != state_version
+        or anchor["goal_id"] != goal_id
+        or anchor["contract_hash"] != contract_hash
+    ):
         return "UNKNOWN"
     return "PASS" if anchor["status"] == "PASS" else "UNKNOWN"
 
@@ -698,7 +717,11 @@ def s2_decide(
                 and cp["global_anchor_receipt_hash"] == digest(cp["global_anchor_receipt"])
             )
         global_status = _global_status(
-            cp["global_anchor"], current_state["version"], provenance_verified=provenance_verified
+            cp["global_anchor"],
+            current_state["version"],
+            provenance_verified=provenance_verified,
+            goal_id=cp["goal_id"],
+            contract_hash=digest(policy),
         )
         terminal = worst_status(integrity, loop_status, final_n2_status, contract, global_status)
         execution_token = _execution_token(cp["goal_id"])
@@ -790,7 +813,10 @@ def execute(
 def default_fixture(boundary: TrustedBoundary):
     state = {"version": 7, "balance": 100, "verified_recipients": ["alice"]}
     policy = {"schema_version": 1, "contract_id": "transfer-v1", "max_amount": 80, "allowed_actions": ["transfer"]}
-    anchor = {"status": "PASS", "independent": True, "scope": ["goal"], "state_version": 7}
+    anchor = {
+        "status": "PASS", "independent": True, "scope": ["goal"], "state_version": 7,
+        "goal_id": "pay-alice", "contract_hash": digest(policy),
+    }
     anchor_receipt = issue_global_anchor(boundary.anchor_secret, anchor)
     evidence_root = "evidence-root-1"
     evidence_receipt = issue_evidence_root(

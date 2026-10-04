@@ -138,7 +138,10 @@ def test_fuzz_untrusted_global_anchor_cannot_create_global_pass(seed):
     policy = {"schema_version": 1, "contract_id": "transfer-v1", "max_amount": 80, "allowed_actions": ["transfer"]}
 
     mode = rng.choice(("not_independent", "wrong_scope", "wrong_version", "unknown"))
-    anchor = {"status": "PASS", "independent": True, "scope": ["goal"], "state_version": 7}
+    anchor = {
+        "status": "PASS", "independent": True, "scope": ["goal"], "state_version": 7,
+        "goal_id": "pay-alice", "contract_hash": r.digest(policy),
+    }
     if mode == "not_independent":
         anchor["independent"] = False
     elif mode == "wrong_scope":
@@ -239,3 +242,28 @@ def test_property_bool_never_aliases_integer_hash():
     for key in ("x", "value", "status", "flag"):
         assert r.digest({key: True}) != r.digest({key: 1})
         assert r.digest({key: False}) != r.digest({key: 0})
+
+
+def _consume_nonce_worker(ledger_path, nonce, queue):
+    try:
+        queue.put(r.FileNonceLedger(ledger_path).consume(nonce))
+    except Exception as exc:
+        queue.put(("ERR", type(exc).__name__))
+
+
+def test_multiprocess_nonce_ledger_allows_exactly_one_consumer(tmp_path):
+    import multiprocessing as mp
+    ctx = mp.get_context("spawn")
+    queue = ctx.Queue()
+    ledger_path = str(tmp_path / "ledger-mp")
+    nonce = "nonce_parallel_20261004"
+    workers = [ctx.Process(target=_consume_nonce_worker, args=(ledger_path, nonce, queue)) for _ in range(16)]
+    for proc in workers:
+        proc.start()
+    for proc in workers:
+        proc.join(15)
+        assert proc.exitcode == 0
+    results = [queue.get(timeout=5) for _ in workers]
+    assert results.count(True) == 1
+    assert results.count(False) == len(workers) - 1
+    assert not any(isinstance(item, tuple) and item[0] == "ERR" for item in results)

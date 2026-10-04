@@ -109,3 +109,27 @@ The file ledger provides local at-most-once replay protection across process res
 ## Known unresolved boundary — wrong specification
 
 A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact-action executor can still enforce a semantically wrong/incomplete policy if the trusted starting specification itself is wrong. This is not classified as fixed. The architecture must preserve bounded claims and use UNKNOWN when independent semantic grounding is unavailable.
+
+## F9 — transient combined-suite failure remains unexplained
+
+**Failure mode:** One combined invocation of the pre-existing repository suite plus the grouped experiment produced a large experiment-only failure set, including apparently stale/incomplete anchor data. No source edit was intentionally performed during that invocation.
+
+**Root cause:** **UNKNOWN.** The same combined scope subsequently passed twice in fresh pytest processes without a code change. The evidence therefore establishes a transient/flaky run, not a reproducible product defect and not a resolved cause.
+
+**Guardrail:** Do not discard the failed observation. Keep experiment-only, pre-existing-plus-fuzz, pre-existing-plus-targeted, and full combined runs separable; require a fresh-process rerun after any anomalous combined result. Do not call the suite stable solely from one green run.
+
+**Regression / challenge:** The exact combined scope was rerun twice in fresh pytest processes after the anomaly; both passed, with the latest reporting 736 passed. The new multiprocess nonce test independently passed with exactly one of 16 consumers succeeding.
+
+**Version change:** none. No code change is justified without a reproducible failure or new causal evidence; experiment remains 0.1.6.
+
+## F10 ? authenticated global anchor was replayable across goal or contract
+
+**Failure mode:** A correctly authenticated PASS anchor was bound to state version and generic goal scope, but not to the exact goal identity or executable contract. The same signed anchor could therefore be reused for another goal or a changed policy while the local state version remained unchanged.
+
+**Root cause:** Anchor provenance proved who signed the payload, but the payload did not carry goal identity or contract hash. Authentication without context binding permitted semantic replay.
+
+**Guardrail:** Version 0.1.7 adds goal identity and contract hash to the strict anchor schema. The transition rejects any anchor whose goal or contract does not match the transition, and S2 checks the same bindings again before allowing global PASS.
+
+**Regression tests:** test_authenticated_global_anchor_cannot_replay_across_goal and test_authenticated_global_anchor_cannot_replay_across_contract.
+
+**Version change:** experiment 0.1.6 -> **0.1.7**.

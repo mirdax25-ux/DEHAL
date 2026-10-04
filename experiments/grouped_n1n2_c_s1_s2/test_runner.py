@@ -215,7 +215,10 @@ def test_s2_contract_checks_are_independent(state_change, policy_change, expecte
     state.update(state_change)
     policy = deepcopy(f["policy"])
     policy.update(policy_change)
-    anchor = {"status":"PASS","independent":True,"scope":["goal"],"state_version":state["version"]}
+    anchor = {
+        "status":"PASS","independent":True,"scope":["goal"],"state_version":state["version"],
+        "goal_id":"pay-alice","contract_hash":digest(policy),
+    }
     anchor_receipt = r.issue_global_anchor(ANCHOR_KEY, anchor)
     evidence_root = "e2"
     evidence_receipt = r.issue_evidence_root(
@@ -239,11 +242,11 @@ def test_s2_contract_checks_are_independent(state_change, policy_change, expecte
 
 
 @pytest.mark.parametrize("anchor,expected", [
-    ({"status":"UNKNOWN","independent":True,"scope":["goal"],"state_version":7}, "UNKNOWN"),
-    ({"status":"CONFLICT","independent":True,"scope":["goal"],"state_version":7}, "CONFLICT"),
-    ({"status":"PASS","independent":False,"scope":["goal"],"state_version":7}, "UNKNOWN"),
-    ({"status":"PASS","independent":True,"scope":["other"],"state_version":7}, "UNKNOWN"),
-    ({"status":"PASS","independent":True,"scope":["goal"],"state_version":8}, "UNKNOWN"),
+    ({"status":"UNKNOWN","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}, "UNKNOWN"),
+    ({"status":"CONFLICT","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}, "CONFLICT"),
+    ({"status":"PASS","independent":False,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}, "UNKNOWN"),
+    ({"status":"PASS","independent":True,"scope":["other"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}, "UNKNOWN"),
+    ({"status":"PASS","independent":True,"scope":["goal"],"state_version":8,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}, "UNKNOWN"),
 ])
 def test_global_goal_never_inferred_from_contract_pass(anchor, expected):
     boundary = b()
@@ -278,6 +281,46 @@ def test_global_goal_never_inferred_from_contract_pass(anchor, expected):
     payload=boundary.verify(s2,issuer="S2",kind="terminal")
     assert payload["contract_status"] == "PASS"
     assert payload["terminal_status"] == expected
+
+
+def test_authenticated_global_anchor_cannot_replay_across_goal():
+    boundary, f = fx()
+    old_payload = f["transition"]["payload"]
+    with pytest.raises(ProtocolError, match="anchor_context_mismatch"):
+        boundary.make_transition_envelope(
+            goal_id="pay-bob",
+            state=f["state"],
+            policy=f["policy"],
+            evidence_root=old_payload["evidence_root"],
+            previous_receipt_hash="new-prev",
+            global_anchor=old_payload["global_anchor"],
+            global_anchor_receipt=old_payload["global_anchor_receipt"],
+            evidence_receipt=old_payload["evidence_receipt"],
+        )
+
+
+def test_authenticated_global_anchor_cannot_replay_across_contract():
+    boundary, f = fx()
+    old_payload = f["transition"]["payload"]
+    policy = deepcopy(f["policy"])
+    policy["max_amount"] = 60
+    evidence_receipt = r.issue_evidence_root(
+        EVIDENCE_KEY,
+        evidence_root=old_payload["evidence_root"],
+        state_version=f["state"]["version"],
+        contract_hash=digest(policy),
+    )
+    with pytest.raises(ProtocolError, match="anchor_context_mismatch"):
+        boundary.make_transition_envelope(
+            goal_id="pay-alice",
+            state=f["state"],
+            policy=policy,
+            evidence_root=old_payload["evidence_root"],
+            previous_receipt_hash="new-prev",
+            global_anchor=old_payload["global_anchor"],
+            global_anchor_receipt=old_payload["global_anchor_receipt"],
+            evidence_receipt=evidence_receipt,
+        )
 
 
 @pytest.mark.parametrize("presentation", [
@@ -523,7 +566,7 @@ def _terminal_with_anchor(boundary, anchor, anchor_receipt=None):
 
 def test_self_asserted_independent_anchor_without_receipt_stays_unknown():
     boundary=b()
-    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     terminal=_terminal_with_anchor(boundary,anchor,None)
     assert terminal["contract_status"] == "PASS"
     assert terminal["global_goal_status"] == "UNKNOWN"
@@ -533,7 +576,7 @@ def test_self_asserted_independent_anchor_without_receipt_stays_unknown():
 @pytest.mark.parametrize("mutation", ["mac","payload"])
 def test_tampered_global_anchor_receipt_rejected(mutation):
     boundary=b()
-    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
     if mutation == "mac":
         receipt["mac"]="0"*64
@@ -551,7 +594,7 @@ def test_tampered_global_anchor_receipt_rejected(mutation):
 
 def test_global_anchor_receipt_from_wrong_trust_root_rejected():
     boundary=b()
-    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     receipt=r.issue_global_anchor(b"wrong-anchor-root",anchor)
     with pytest.raises(ProtocolError):
         boundary.make_transition_envelope(
@@ -565,8 +608,8 @@ def test_global_anchor_receipt_from_wrong_trust_root_rejected():
 
 def test_global_anchor_receipt_payload_mismatch_rejected():
     boundary=b()
-    signed={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
-    supplied={"status":"UNKNOWN","independent":True,"scope":["goal"],"state_version":7}
+    signed={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
+    supplied={"status":"UNKNOWN","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     receipt=r.issue_global_anchor(ANCHOR_KEY,signed)
     with pytest.raises(ProtocolError):
         boundary.make_transition_envelope(
@@ -581,7 +624,7 @@ def test_global_anchor_receipt_payload_mismatch_rejected():
 def _terminal_with_evidence(boundary, evidence_root, evidence_receipt=None):
     state={"version":7,"balance":100,"verified_recipients":["alice"]}
     policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
-    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
     tr=boundary.make_transition_envelope(
         goal_id="pay-alice",state=state,policy=policy,
@@ -621,7 +664,7 @@ def test_tampered_evidence_receipt_rejected(mutation):
     boundary=b()
     state={"version":7,"balance":100,"verified_recipients":["alice"]}
     policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
-    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
     receipt=r.issue_evidence_root(EVIDENCE_KEY,evidence_root="e",state_version=7,contract_hash=digest(policy))
     if mutation == "mac":
@@ -640,7 +683,7 @@ def test_evidence_receipt_from_wrong_trust_root_rejected():
     boundary=b()
     state={"version":7,"balance":100,"verified_recipients":["alice"]}
     policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
-    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
     receipt=r.issue_evidence_root(b"wrong-evidence-root-key",evidence_root="e",state_version=7,contract_hash=digest(policy))
     with pytest.raises(ProtocolError):
@@ -655,7 +698,7 @@ def test_evidence_receipt_binding_mismatch_rejected():
     boundary=b()
     state={"version":7,"balance":100,"verified_recipients":["alice"]}
     policy={"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]}
-    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7}
+    anchor={"status":"PASS","independent":True,"scope":["goal"],"state_version":7,"goal_id":"pay-alice","contract_hash":digest({"schema_version":1,"contract_id":"transfer-v1","max_amount":80,"allowed_actions":["transfer"]})}
     anchor_receipt=r.issue_global_anchor(ANCHOR_KEY,anchor)
     receipt=r.issue_evidence_root(EVIDENCE_KEY,evidence_root="different-root",state_version=7,contract_hash=digest(policy))
     with pytest.raises(ProtocolError):
