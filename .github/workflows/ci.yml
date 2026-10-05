@@ -42,6 +42,14 @@ jobs:
       - name: Test
         run: python -m pytest
 
+      - name: Grouped architecture experiment
+        run: |
+          python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
+          python -m compileall -q experiments/grouped_n1n2_c_s1_s2
+
+      - name: Combined core + grouped regression
+        run: python -m pytest -q tests experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/grouped_n1n2_c_s1_s2/test_fuzz.py
+
       - name: Runtime provenance gate
         run: |
           python - <<'PY'
