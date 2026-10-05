@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.9"
+VERSION = "0.1.10"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -193,35 +193,43 @@ def issue_evidence_root(
 def issue_action_authority(
     action_secret: bytes,
     *,
+    action_policy: dict[str, Any],
     goal_id: str,
-    action_hash: str,
+    action: dict[str, Any],
     state_hash: str,
     state_version: int,
     contract_hash: str,
     execution_token: str,
 ) -> dict[str, Any]:
-    """Issue a separately grounded capability for one exact external action."""
+    """Issue a capability only after an independent action policy authorizes it."""
     if type(action_secret) is not bytes or not action_secret:
         raise ProtocolError("invalid_action_secret")
-    if not _name(goal_id):
-        raise ProtocolError("invalid_action_goal_id")
+    validate_action_policy(action_policy)
+    validate_candidate({"goal_id": goal_id, "state_version": state_version, "action": action})
+    if _action_authority_status(
+        goal_id=goal_id,
+        action=action,
+        state_version=state_version,
+        action_policy=action_policy,
+    ) != "PASS":
+        raise ProtocolError("action_not_authorized")
     for value, error in (
-        (action_hash, "invalid_action_hash"),
         (state_hash, "invalid_action_state_hash"),
         (contract_hash, "invalid_action_contract_hash"),
         (execution_token, "invalid_action_execution_token"),
     ):
         if type(value) is not str or re.fullmatch(r"[a-f0-9]{64}", value) is None:
             raise ProtocolError(error)
-    if type(state_version) is not int or state_version < 0:
-        raise ProtocolError("invalid_action_state_version")
     payload = {
         "goal_id": goal_id,
-        "action_hash": action_hash,
+        "action_hash": digest(action),
         "state_hash": state_hash,
         "state_version": state_version,
         "contract_hash": contract_hash,
         "execution_token": execution_token,
+        "action_policy_id": action_policy["policy_id"],
+        "action_policy_hash": digest(action_policy),
+        "authority_scope": action_policy["authority_scope"],
     }
     body = {
         "v": VERSION,
@@ -311,15 +319,22 @@ class TrustedBoundary:
         payload = receipt["payload"]
         _strict_keys(
             payload,
-            ("goal_id", "action_hash", "state_hash", "state_version", "contract_hash", "execution_token"),
+            (
+                "goal_id", "action_hash", "state_hash", "state_version",
+                "contract_hash", "execution_token", "action_policy_id",
+                "action_policy_hash", "authority_scope",
+            ),
         )
-        if not _name(payload["goal_id"]):
-            raise ProtocolError("invalid_action_goal_id")
+        if not _name(payload["goal_id"]) or not _name(payload["action_policy_id"]):
+            raise ProtocolError("invalid_action_authority_identity")
+        if payload["authority_scope"] != "external_side_effect":
+            raise ProtocolError("invalid_action_authority_scope")
         for value, error in (
             (payload["action_hash"], "invalid_action_hash"),
             (payload["state_hash"], "invalid_action_state_hash"),
             (payload["contract_hash"], "invalid_action_contract_hash"),
             (payload["execution_token"], "invalid_action_execution_token"),
+            (payload["action_policy_hash"], "invalid_action_policy_hash"),
         ):
             if type(value) is not str or re.fullmatch(r"[a-f0-9]{64}", value) is None:
                 raise ProtocolError(error)
@@ -425,6 +440,61 @@ def validate_policy(policy: Any):
     actions = policy["allowed_actions"]
     if type(actions) is not list or not actions or any(not _name(x) for x in actions):
         raise ProtocolError("invalid_allowed_actions")
+
+
+def validate_action_policy(policy: Any):
+    _strict_keys(
+        policy,
+        (
+            "schema_version", "policy_id", "authority_scope", "state_version",
+            "allowed_goals", "max_amount", "allowed_actions", "allowed_recipients",
+        ),
+    )
+    if policy["schema_version"] != 1 or type(policy["schema_version"]) is not int:
+        raise ProtocolError("unsupported_action_policy_schema")
+    if not _name(policy["policy_id"]):
+        raise ProtocolError("invalid_action_policy_id")
+    if policy["authority_scope"] != "external_side_effect":
+        raise ProtocolError("invalid_action_policy_scope")
+    if type(policy["state_version"]) is not int or policy["state_version"] < 0:
+        raise ProtocolError("invalid_action_policy_state_version")
+    if type(policy["max_amount"]) is not int or policy["max_amount"] <= 0:
+        raise ProtocolError("invalid_action_policy_max_amount")
+    for key, error in (
+        ("allowed_goals", "invalid_action_policy_goals"),
+        ("allowed_actions", "invalid_action_policy_actions"),
+        ("allowed_recipients", "invalid_action_policy_recipients"),
+    ):
+        values = policy[key]
+        if (
+            type(values) is not list
+            or not values
+            or any(not _name(x) for x in values)
+            or len(values) != len(set(values))
+        ):
+            raise ProtocolError(error)
+
+
+def _action_authority_status(
+    *,
+    goal_id: str,
+    action: dict[str, Any],
+    state_version: int,
+    action_policy: dict[str, Any],
+) -> str:
+    validate_action_policy(action_policy)
+    validate_candidate({"goal_id": goal_id, "state_version": state_version, "action": action})
+    if action_policy["state_version"] != state_version:
+        return "BLOCK"
+    if goal_id not in action_policy["allowed_goals"]:
+        return "BLOCK"
+    if action["type"] not in action_policy["allowed_actions"]:
+        return "BLOCK"
+    if action["recipient"] not in action_policy["allowed_recipients"]:
+        return "BLOCK"
+    if action["amount"] > action_policy["max_amount"]:
+        return "BLOCK"
+    return "PASS"
 
 
 def validate_anchor(anchor: Any):
@@ -871,6 +941,7 @@ def execute(
     current_policy: dict[str, Any],
     action: dict[str, Any],
     action_authority_receipt: dict[str, Any] | None = None,
+    current_action_policy: dict[str, Any] | None = None,
     nonce_ledger: FileNonceLedger,
 ) -> str:
     try:
@@ -889,8 +960,9 @@ def execute(
             or terminal["global_truth_certified"] is not False
         ):
             return "BLOCK"
-        if action_authority_receipt is None:
+        if action_authority_receipt is None or current_action_policy is None:
             return "BLOCK"
+        validate_action_policy(current_action_policy)
         authority = boundary.verify_action_authority(action_authority_receipt)
         expected_authority = {
             "goal_id": terminal["goal_id"],
@@ -899,6 +971,9 @@ def execute(
             "state_version": terminal["state_version"],
             "contract_hash": terminal["contract_hash"],
             "execution_token": terminal["execution_token"],
+            "action_policy_id": current_action_policy["policy_id"],
+            "action_policy_hash": digest(current_action_policy),
+            "authority_scope": current_action_policy["authority_scope"],
         }
         if authority != expected_authority:
             return "BLOCK"
@@ -911,6 +986,13 @@ def execute(
         if terminal["contract_hash"] != digest(current_policy):
             return "BLOCK"
         if _contract_status({"action": action}, current_state, current_policy) != "PASS":
+            return "BLOCK"
+        if _action_authority_status(
+            goal_id=terminal["goal_id"],
+            action=action,
+            state_version=current_state["version"],
+            action_policy=current_action_policy,
+        ) != "PASS":
             return "BLOCK"
         execution_token = terminal["execution_token"]
         if not nonce_ledger.consume(execution_token):
@@ -962,17 +1044,6 @@ def default_fixture(boundary: TrustedBoundary):
     s2 = s2_decide(boundary, checkpoint=checkpoint, s1_receipt=s1, current_state=state, policy=policy,
 )
     output = render_readonly(boundary, terminal_receipt=s2, presentation={"text": "Transfer ready."})
-    terminal = boundary.verify(s2, issuer="S2", kind="terminal")
-    action_authority = issue_action_authority(
-        boundary.action_secret,
-        goal_id=terminal["goal_id"],
-        action_hash=terminal["action_hash"],
-        state_hash=terminal["state_hash"],
-        state_version=terminal["state_version"],
-        contract_hash=terminal["contract_hash"],
-        execution_token=terminal["execution_token"],
-    )
     return {"state": state, "policy": policy, "anchor": anchor, "transition": transition,
             "initial": initial, "exchanges": exchanges, "loop": loop, "final_n2": final_receipt,
-            "checkpoint": checkpoint, "s1": s1, "s2": s2, "output": output,
-            "action_authority": action_authority}
+            "checkpoint": checkpoint, "s1": s1, "s2": s2, "output": output}
