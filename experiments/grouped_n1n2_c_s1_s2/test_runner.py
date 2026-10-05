@@ -20,11 +20,11 @@ worst_status = r.worst_status
 
 KEY = b"prototype-test-key-32-bytes-long!!"
 ANCHOR_KEY = b"independent-anchor-key-32-bytes!"
-EVIDENCE_KEY = b"independent-evidence-key-32-bytes"
+EVIDENCE_KEY = b"independent-evidence-key-32-bytes"\nACTION_KEY = b"independent-action-key-32-bytes!!"
 
 
 def b():
-    return TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY)
+    return TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY, ACTION_KEY)
 
 
 def fx():
@@ -37,8 +37,8 @@ def test_valid_full_flow_executes_once_then_noop(tmp_path):
     assert f["output"]["terminal_status"] == "PASS"
     action = f["output"]["action"]
     ledger = r.FileNonceLedger(tmp_path / "ledger")
-    assert execute(boundary, output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=ledger) == "EXECUTED"
-    assert execute(boundary, output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=ledger) == "NOOP"
+    assert execute(boundary, action_authority_receipt=f["action_authority"], output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=ledger) == "EXECUTED"
+    assert execute(boundary, action_authority_receipt=f["action_authority"], output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=ledger) == "NOOP"
 
 
 @pytest.mark.parametrize("path,value", [
@@ -367,7 +367,7 @@ def test_executor_rejects_output_tampering(mutate, tmp_path):
         out["state_version"] += 1
     else:
         out["terminal_receipt"]["mac"]="0"*64
-    assert execute(boundary, output=out, current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert execute(boundary, action_authority_receipt=f["action_authority"], output=out, current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("change", [
@@ -377,7 +377,7 @@ def test_executor_rejects_state_change_after_s2(change, tmp_path):
     boundary, f = fx()
     state=deepcopy(f["state"])
     state.update(change)
-    assert execute(boundary, output=f["output"], current_state=state, current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert execute(boundary, action_authority_receipt=f["action_authority"], output=f["output"], current_state=state, current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("change", [
@@ -387,14 +387,14 @@ def test_executor_rejects_different_action(change, tmp_path):
     boundary, f = fx()
     action=deepcopy(f["output"]["action"])
     action.update(change)
-    assert execute(boundary, output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert execute(boundary, action_authority_receipt=f["action_authority"], output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 def test_receipt_mix_and_match_rejected(tmp_path):
     boundary, f = fx()
     out=deepcopy(f["output"])
     out["action"]["amount"]=39
-    assert execute(boundary, output=out, current_state=f["state"], current_policy=f["policy"], action=out["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert execute(boundary, action_authority_receipt=f["action_authority"], output=out, current_state=f["state"], current_policy=f["policy"], action=out["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 def test_s1_receipt_cannot_be_reused_for_other_checkpoint():
@@ -718,8 +718,7 @@ def test_executor_rejects_policy_drift_after_s2(tmp_path):
         f["state"],
         changed,
     ) == "BLOCK"
-    assert execute(
-        boundary,
+    assert execute(boundary, action_authority_receipt=f["action_authority"],
         output=f["output"],
         current_state=f["state"],
         current_policy=changed,
@@ -732,8 +731,7 @@ def test_file_nonce_ledger_blocks_replay_after_boundary_restart(tmp_path):
     first_boundary, f = fx()
     ledger_path = tmp_path / "ledger"
     action = f["output"]["action"]
-    assert execute(
-        first_boundary,
+    assert execute(first_boundary, action_authority_receipt=f["action_authority"],
         output=f["output"],
         current_state=f["state"],
         current_policy=f["policy"],
@@ -741,9 +739,8 @@ def test_file_nonce_ledger_blocks_replay_after_boundary_restart(tmp_path):
         nonce_ledger=r.FileNonceLedger(ledger_path),
     ) == "EXECUTED"
 
-    restarted_boundary = TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY)
-    assert execute(
-        restarted_boundary,
+    restarted_boundary = TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY, ACTION_KEY)
+    assert execute(restarted_boundary, action_authority_receipt=f["action_authority"],
         output=f["output"],
         current_state=f["state"],
         current_policy=f["policy"],
@@ -754,8 +751,7 @@ def test_file_nonce_ledger_blocks_replay_after_boundary_restart(tmp_path):
 
 def test_executor_fails_closed_without_durable_ledger(tmp_path):
     boundary, f = fx()
-    assert execute(
-        boundary,
+    assert execute(boundary, action_authority_receipt=f["action_authority"],
         output=f["output"],
         current_state=f["state"],
         current_policy=f["policy"],
@@ -768,8 +764,7 @@ def test_s2_recertification_cannot_rotate_execution_token(tmp_path):
     boundary, f = fx()
     ledger = r.FileNonceLedger(tmp_path / "ledger")
     action = f["output"]["action"]
-    assert execute(
-        boundary,
+    assert execute(boundary, action_authority_receipt=f["action_authority"],
         output=f["output"],
         current_state=f["state"],
         current_policy=f["policy"],
@@ -794,8 +789,7 @@ def test_s2_recertification_cannot_rotate_execution_token(tmp_path):
         terminal_receipt=second_s2,
         presentation={"text": "same goal recertified"},
     )
-    assert execute(
-        boundary,
+    assert execute(boundary, action_authority_receipt=f["action_authority"],
         output=second_output,
         current_state=f["state"],
         current_policy=f["policy"],
@@ -825,8 +819,7 @@ def test_readonly_layer_cannot_upgrade_bounded_pass_to_global_truth(tmp_path):
         )
     tampered = deepcopy(f["output"])
     tampered["global_truth_certified"] = True
-    assert execute(
-        boundary,
+    assert execute(boundary, action_authority_receipt=f["action_authority"],
         output=tampered,
         current_state=f["state"],
         current_policy=f["policy"],
@@ -847,16 +840,14 @@ def test_common_mode_wrong_spec_remains_explicit_trust_boundary():
     assert f["output"]["epistemic_scope"] == "authenticated_inputs_and_declared_requirements_only"
 
 
-@pytest.mark.xfail(strict=True, reason="F12 OPEN: bounded PASS still authorizes side effect without separate action authority")
-def test_bounded_pass_without_global_truth_still_executes_real_action_red(tmp_path):
+def test_bounded_pass_without_separate_action_authority_is_blocked(tmp_path):
     boundary, f = fx()
     assert f["output"]["terminal_status"] == "PASS"
     assert f["output"]["global_truth_certified"] is False
     assert f["output"]["epistemic_scope"] == "authenticated_inputs_and_declared_requirements_only"
     # Safety target for this RED attack: a non-globally-certified decision must
     # not itself be sufficient authority for an irreversible side effect.
-    result = execute(
-        boundary,
+    result = execute(boundary,
         output=f["output"],
         current_state=f["state"],
         current_policy=f["policy"],
@@ -864,3 +855,73 @@ def test_bounded_pass_without_global_truth_still_executes_real_action_red(tmp_pa
         nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
     )
     assert result == "BLOCK"
+
+
+def _issue_authority_for_fixture(f, *, secret=ACTION_KEY, **overrides):
+    terminal = b().verify(f["s2"], issuer="S2", kind="terminal")
+    payload = {
+        "goal_id": terminal["goal_id"],
+        "action_hash": terminal["action_hash"],
+        "state_hash": terminal["state_hash"],
+        "state_version": terminal["state_version"],
+        "contract_hash": terminal["contract_hash"],
+        "execution_token": terminal["execution_token"],
+    }
+    payload.update(overrides)
+    return r.issue_action_authority(secret, **payload)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("goal_id", "other-goal"),
+    ("action_hash", "0"*64),
+    ("state_hash", "1"*64),
+    ("state_version", 8),
+    ("contract_hash", "2"*64),
+    ("execution_token", "3"*64),
+])
+def test_action_authority_is_bound_to_exact_execution_context(field, value, tmp_path):
+    boundary, f = fx()
+    authority = _issue_authority_for_fixture(f, **{field: value})
+    assert execute(
+        boundary,
+        action_authority_receipt=authority,
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    ) == "BLOCK"
+
+
+def test_action_authority_from_wrong_trust_root_is_blocked(tmp_path):
+    boundary, f = fx()
+    authority = _issue_authority_for_fixture(f, secret=KEY)
+    assert execute(
+        boundary,
+        action_authority_receipt=authority,
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    ) == "BLOCK"
+
+
+def test_action_authority_tamper_is_blocked(tmp_path):
+    boundary, f = fx()
+    authority = deepcopy(f["action_authority"])
+    authority["mac"] = "0"*64
+    assert execute(
+        boundary,
+        action_authority_receipt=authority,
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    ) == "BLOCK"
+
+
+def test_trust_roots_must_be_distinct():
+    with pytest.raises(ProtocolError, match="trust_roots_not_distinct"):
+        TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY, KEY)
