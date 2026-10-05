@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.8"
+VERSION = "0.1.9"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -190,11 +190,55 @@ def issue_evidence_root(
     return {**body, "mac": mac}
 
 
+def issue_action_authority(
+    action_secret: bytes,
+    *,
+    goal_id: str,
+    action_hash: str,
+    state_hash: str,
+    state_version: int,
+    contract_hash: str,
+    execution_token: str,
+) -> dict[str, Any]:
+    """Issue a separately grounded capability for one exact external action."""
+    if type(action_secret) is not bytes or not action_secret:
+        raise ProtocolError("invalid_action_secret")
+    if not _name(goal_id):
+        raise ProtocolError("invalid_action_goal_id")
+    for value, error in (
+        (action_hash, "invalid_action_hash"),
+        (state_hash, "invalid_action_state_hash"),
+        (contract_hash, "invalid_action_contract_hash"),
+        (execution_token, "invalid_action_execution_token"),
+    ):
+        if type(value) is not str or re.fullmatch(r"[a-f0-9]{64}", value) is None:
+            raise ProtocolError(error)
+    if type(state_version) is not int or state_version < 0:
+        raise ProtocolError("invalid_action_state_version")
+    payload = {
+        "goal_id": goal_id,
+        "action_hash": action_hash,
+        "state_hash": state_hash,
+        "state_version": state_version,
+        "contract_hash": contract_hash,
+        "execution_token": execution_token,
+    }
+    body = {
+        "v": VERSION,
+        "issuer": "ACTION-AUTHORITY",
+        "kind": "capability",
+        "payload": payload,
+    }
+    mac = hmac.new(action_secret, canonical(body), hashlib.sha256).hexdigest()
+    return {**body, "mac": mac}
+
+
 @dataclass
 class TrustedBoundary:
     secret: bytes
     anchor_secret: bytes
     evidence_secret: bytes
+    action_secret: bytes
 
     def __post_init__(self) -> None:
         if type(self.secret) is not bytes or not self.secret:
@@ -203,6 +247,10 @@ class TrustedBoundary:
             raise ProtocolError("invalid_anchor_secret")
         if type(self.evidence_secret) is not bytes or not self.evidence_secret:
             raise ProtocolError("invalid_evidence_secret")
+        if type(self.action_secret) is not bytes or not self.action_secret:
+            raise ProtocolError("invalid_action_secret")
+        if len({self.secret, self.anchor_secret, self.evidence_secret, self.action_secret}) != 4:
+            raise ProtocolError("trust_roots_not_distinct")
 
     def _mac(self, body: dict[str, Any]) -> str:
         return hmac.new(self.secret, canonical(body), hashlib.sha256).hexdigest()
@@ -244,6 +292,39 @@ class TrustedBoundary:
             raise ProtocolError("invalid_evidence_state_version")
         if type(payload["contract_hash"]) is not str or re.fullmatch(r"[a-f0-9]{64}", payload["contract_hash"]) is None:
             raise ProtocolError("invalid_evidence_contract_hash")
+        return deepcopy(payload)
+
+
+    def verify_action_authority(self, receipt: Any) -> dict[str, Any]:
+        _strict_keys(receipt, ("v", "issuer", "kind", "payload", "mac"))
+        if (
+            receipt["v"] != VERSION
+            or receipt["issuer"] != "ACTION-AUTHORITY"
+            or receipt["kind"] != "capability"
+            or type(receipt["mac"]) is not str
+        ):
+            raise ProtocolError("invalid_action_authority_receipt")
+        body = {k: deepcopy(receipt[k]) for k in ("v", "issuer", "kind", "payload")}
+        expected = hmac.new(self.action_secret, canonical(body), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(receipt["mac"], expected):
+            raise ProtocolError("action_authority_mac_mismatch")
+        payload = receipt["payload"]
+        _strict_keys(
+            payload,
+            ("goal_id", "action_hash", "state_hash", "state_version", "contract_hash", "execution_token"),
+        )
+        if not _name(payload["goal_id"]):
+            raise ProtocolError("invalid_action_goal_id")
+        for value, error in (
+            (payload["action_hash"], "invalid_action_hash"),
+            (payload["state_hash"], "invalid_action_state_hash"),
+            (payload["contract_hash"], "invalid_action_contract_hash"),
+            (payload["execution_token"], "invalid_action_execution_token"),
+        ):
+            if type(value) is not str or re.fullmatch(r"[a-f0-9]{64}", value) is None:
+                raise ProtocolError(error)
+        if type(payload["state_version"]) is not int or payload["state_version"] < 0:
+            raise ProtocolError("invalid_action_state_version")
         return deepcopy(payload)
 
     def issue(self, *, issuer: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -726,6 +807,7 @@ def s2_decide(
         terminal = worst_status(integrity, loop_status, final_n2_status, contract, global_status)
         execution_token = _execution_token(cp["goal_id"])
         payload = {
+            "goal_id": cp["goal_id"],
             "terminal_status": terminal,
             "integrity_status": integrity,
             "loop_status": loop_status,
@@ -744,6 +826,7 @@ def s2_decide(
         }
     except (ProtocolError, KeyError, TypeError, ValueError, OverflowError):
         payload = {
+            "goal_id": None,
             "terminal_status": "BLOCK",
             "integrity_status": "BLOCK",
             "loop_status": "UNKNOWN",
@@ -787,6 +870,7 @@ def execute(
     current_state: dict[str, Any],
     current_policy: dict[str, Any],
     action: dict[str, Any],
+    action_authority_receipt: dict[str, Any] | None,
     nonce_ledger: FileNonceLedger,
 ) -> str:
     try:
@@ -804,6 +888,19 @@ def execute(
             or output["global_truth_certified"] is not terminal["global_truth_certified"]
             or terminal["global_truth_certified"] is not False
         ):
+            return "BLOCK"
+        if action_authority_receipt is None:
+            return "BLOCK"
+        authority = boundary.verify_action_authority(action_authority_receipt)
+        expected_authority = {
+            "goal_id": terminal["goal_id"],
+            "action_hash": terminal["action_hash"],
+            "state_hash": terminal["state_hash"],
+            "state_version": terminal["state_version"],
+            "contract_hash": terminal["contract_hash"],
+            "execution_token": terminal["execution_token"],
+        }
+        if authority != expected_authority:
             return "BLOCK"
         if output["action_hash"] != terminal["action_hash"] or digest(action) != terminal["action_hash"]:
             return "BLOCK"
@@ -865,6 +962,17 @@ def default_fixture(boundary: TrustedBoundary):
     s2 = s2_decide(boundary, checkpoint=checkpoint, s1_receipt=s1, current_state=state, policy=policy,
 )
     output = render_readonly(boundary, terminal_receipt=s2, presentation={"text": "Transfer ready."})
+    terminal = boundary.verify(s2, issuer="S2", kind="terminal")
+    action_authority = issue_action_authority(
+        boundary.action_secret,
+        goal_id=terminal["goal_id"],
+        action_hash=terminal["action_hash"],
+        state_hash=terminal["state_hash"],
+        state_version=terminal["state_version"],
+        contract_hash=terminal["contract_hash"],
+        execution_token=terminal["execution_token"],
+    )
     return {"state": state, "policy": policy, "anchor": anchor, "transition": transition,
             "initial": initial, "exchanges": exchanges, "loop": loop, "final_n2": final_receipt,
-            "checkpoint": checkpoint, "s1": s1, "s2": s2, "output": output}
+            "checkpoint": checkpoint, "s1": s1, "s2": s2, "output": output,
+            "action_authority": action_authority}
