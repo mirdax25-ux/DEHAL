@@ -926,3 +926,26 @@ def test_action_authority_tamper_is_blocked(tmp_path):
 def test_trust_roots_must_be_distinct():
     with pytest.raises(ProtocolError, match="trust_roots_not_distinct"):
         TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY, KEY)
+
+
+
+def test_action_authority_derived_only_from_s2_cannot_upgrade_bounded_pass_to_execution(tmp_path):
+    boundary, f = fx()
+    external_requirement = {"max_amount": 30}
+    assert f["output"]["action"]["amount"] == 40
+    assert f["output"]["action"]["amount"] > external_requirement["max_amount"]
+    assert f["output"]["terminal_status"] == "PASS"
+    assert f["output"]["global_truth_certified"] is False
+
+    # Adversarial target: an action authority derived only from the same bounded
+    # S2 result must not upgrade that bounded epistemic PASS into real execution.
+    result = execute(
+        boundary,
+        action_authority_receipt=f["action_authority"],
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    )
+    assert result == "BLOCK"
