@@ -926,3 +926,40 @@ def test_action_authority_tamper_is_blocked(tmp_path):
 def test_trust_roots_must_be_distinct():
     with pytest.raises(ProtocolError, match="trust_roots_not_distinct"):
         TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY, KEY)
+
+
+def test_same_chain_auto_minted_action_authority_is_not_independent_red(tmp_path):
+    boundary, f = fx()
+    terminal = boundary.verify(f["s2"], issuer="S2", kind="terminal")
+    authority = boundary.verify_action_authority(f["action_authority"])
+
+    expected_from_same_chain = {
+        "goal_id": terminal["goal_id"],
+        "action_hash": terminal["action_hash"],
+        "state_hash": terminal["state_hash"],
+        "state_version": terminal["state_version"],
+        "contract_hash": terminal["contract_hash"],
+        "execution_token": terminal["execution_token"],
+    }
+    assert authority == expected_from_same_chain
+
+    # Reproduce the F11/F12 composition hazard: a real semantic requirement is
+    # absent from the trusted specification, while the action capability was
+    # minted automatically from that same bounded terminal result.
+    external_requirement = {"max_amount": 30}
+    assert f["output"]["action"]["amount"] == 40
+    assert f["output"]["action"]["amount"] > external_requirement["max_amount"]
+    assert f["output"]["global_truth_certified"] is False
+
+    result = execute(
+        boundary,
+        action_authority_receipt=f["action_authority"],
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    )
+    # Safety target: a capability derived only from the same bounded reasoning
+    # chain is not independent action authority.
+    assert result == "BLOCK"
