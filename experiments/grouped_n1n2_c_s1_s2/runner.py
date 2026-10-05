@@ -870,7 +870,7 @@ def execute(
     current_state: dict[str, Any],
     current_policy: dict[str, Any],
     action: dict[str, Any],
-    action_authority_receipt: dict[str, Any] | None,
+    action_authority_receipt: dict[str, Any] | None = None,
     nonce_ledger: FileNonceLedger,
 ) -> str:
     try:
