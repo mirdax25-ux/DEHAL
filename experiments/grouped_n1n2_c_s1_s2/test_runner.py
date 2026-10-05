@@ -957,3 +957,29 @@ def test_action_authority_derived_only_from_s2_cannot_upgrade_bounded_pass_to_ex
         nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
     )
     assert result == "BLOCK"
+
+
+
+def test_rotated_external_action_basis_invalidates_old_authority(tmp_path):
+    boundary, f = fx()
+    old_basis_root = f["action_basis"]["payload"]["basis_root"]
+    current_basis_root = digest({
+        "source": "external-test-approval",
+        "approval_id": "rotated-authority-root-2",
+    })
+    assert old_basis_root != current_basis_root
+
+    # Safety target: after the external authority rotates/revokes its current
+    # approval basis, an older capability must not remain executable merely
+    # because goal/action/state/policy stayed unchanged.
+    result = execute(
+        boundary,
+        action_authority_receipt=f["action_authority"],
+        current_action_basis_root=current_basis_root,
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    )
+    assert result == "BLOCK"
