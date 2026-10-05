@@ -20,7 +20,8 @@ worst_status = r.worst_status
 
 KEY = b"prototype-test-key-32-bytes-long!!"
 ANCHOR_KEY = b"independent-anchor-key-32-bytes!"
-EVIDENCE_KEY = b"independent-evidence-key-32-bytes"\nACTION_KEY = b"independent-action-key-32-bytes!!"
+EVIDENCE_KEY = b"independent-evidence-key-32-bytes"
+ACTION_KEY = b"independent-action-key-32-bytes!!"
 
 
 def b():
