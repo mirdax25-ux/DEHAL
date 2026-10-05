@@ -926,3 +926,27 @@ def test_action_authority_tamper_is_blocked(tmp_path):
 def test_trust_roots_must_be_distinct():
     with pytest.raises(ProtocolError, match="trust_roots_not_distinct"):
         TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY, KEY)
+
+
+def test_same_boundary_cannot_self_issue_action_authority(tmp_path):
+    boundary, f = fx()
+    terminal = boundary.verify(f["s2"], issuer="S2", kind="terminal")
+    self_issued = r.issue_action_authority(
+        boundary.action_secret,
+        goal_id=terminal["goal_id"],
+        action_hash=terminal["action_hash"],
+        state_hash=terminal["state_hash"],
+        state_version=terminal["state_version"],
+        contract_hash=terminal["contract_hash"],
+        execution_token=terminal["execution_token"],
+    )
+    result = execute(
+        boundary,
+        action_authority_receipt=self_issued,
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    )
+    assert result == "BLOCK"
