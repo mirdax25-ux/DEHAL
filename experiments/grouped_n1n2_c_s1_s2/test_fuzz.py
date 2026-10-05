@@ -21,9 +21,36 @@ def boundary():
     return r.TrustedBoundary(KEY, ANCHOR_KEY, EVIDENCE_KEY, ACTION_KEY)
 
 
+def _action_policy_for(f):
+    return {
+        "schema_version": 1,
+        "policy_id": "independent-action-policy-v1",
+        "authority_scope": "external_side_effect",
+        "state_version": f["state"]["version"],
+        "allowed_goals": ["pay-alice"],
+        "max_amount": 80,
+        "allowed_actions": ["transfer"],
+        "allowed_recipients": ["alice"],
+    }
+
+
 def fixture():
     b = boundary()
-    return b, r.default_fixture(b)
+    f = r.default_fixture(b)
+    action_policy = _action_policy_for(f)
+    terminal = b.verify(f["s2"], issuer="S2", kind="terminal")
+    f["action_policy"] = action_policy
+    f["action_authority"] = r.issue_action_authority(
+        b.action_secret,
+        action_policy=action_policy,
+        goal_id=terminal["goal_id"],
+        action=f["output"]["action"],
+        state_hash=terminal["state_hash"],
+        state_version=terminal["state_version"],
+        contract_hash=terminal["contract_hash"],
+        execution_token=terminal["execution_token"],
+    )
+    return b, f
 
 
 def rand_text(rng, n=10):
@@ -45,7 +72,7 @@ def test_fuzz_executor_rejects_random_action_mutation(seed, tmp_path):
         action["type"] = "a_" + rand_text(rng, 8)
     else:
         action["memo"] = "m_" + rand_text(rng, 12)
-    assert r.execute(b, action_authority_receipt=f["action_authority"], output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert r.execute(b, action_authority_receipt=f["action_authority"], current_action_policy=f["action_policy"], output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -60,7 +87,7 @@ def test_fuzz_executor_rejects_random_state_mutation(seed, tmp_path):
         state["balance"] += rng.randint(1, 100)
     else:
         state["verified_recipients"] = ["alice", "u_" + rand_text(rng, 8)]
-    assert r.execute(b, action_authority_receipt=f["action_authority"], output=f["output"], current_state=state, current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert r.execute(b, action_authority_receipt=f["action_authority"], current_action_policy=f["action_policy"], output=f["output"], current_state=state, current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -88,7 +115,7 @@ def test_fuzz_terminal_receipt_tamper_never_executes(seed, tmp_path):
         receipt["payload"]["state_version"] += rng.randint(1, 20)
     elif choice == "execution_token":
         receipt["payload"]["execution_token"] = "nonce_" + rand_text(rng, 10)
-    assert r.execute(b, action_authority_receipt=f["action_authority"], output=out, current_state=f["state"], current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert r.execute(b, action_authority_receipt=f["action_authority"], current_action_policy=f["action_policy"], output=out, current_state=f["state"], current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -274,7 +301,7 @@ def test_fuzz_action_authority_tamper_never_executes(seed, tmp_path):
     rng = random.Random(seed)
     b, f = fixture()
     authority = deepcopy(f["action_authority"])
-    choice = rng.choice(("mac", "issuer", "kind", "goal_id", "action_hash", "state_hash", "state_version", "contract_hash", "execution_token"))
+    choice = rng.choice(("mac", "issuer", "kind", "goal_id", "action_hash", "state_hash", "state_version", "contract_hash", "execution_token", "action_policy_id", "action_policy_hash", "authority_scope"))
     if choice == "mac":
         authority["mac"] = rand_text(rng, 64)
     elif choice == "issuer":
@@ -290,6 +317,42 @@ def test_fuzz_action_authority_tamper_never_executes(seed, tmp_path):
     assert r.execute(
         b,
         action_authority_receipt=authority,
+        current_action_policy=f["action_policy"],
+        output=f["output"],
+        current_state=f["state"],
+        current_policy=f["policy"],
+        action=f["output"]["action"],
+        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
+    ) == "BLOCK"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_fuzz_action_policy_mutation_never_executes(seed, tmp_path):
+    rng = random.Random(seed)
+    b, f = fixture()
+    policy = deepcopy(f["action_policy"])
+    choice = rng.choice((
+        "max_amount", "state_version", "allowed_goals", "allowed_actions",
+        "allowed_recipients", "policy_id", "authority_scope",
+    ))
+    if choice == "max_amount":
+        policy[choice] = rng.randint(1, 39)
+    elif choice == "state_version":
+        policy[choice] += rng.randint(1, 20)
+    elif choice == "allowed_goals":
+        policy[choice] = ["other-goal"]
+    elif choice == "allowed_actions":
+        policy[choice] = ["other-action"]
+    elif choice == "allowed_recipients":
+        policy[choice] = ["bob"]
+    elif choice == "policy_id":
+        policy[choice] = "other-action-policy"
+    else:
+        policy[choice] = "other_scope"
+    assert r.execute(
+        b,
+        action_authority_receipt=f["action_authority"],
+        current_action_policy=policy,
         output=f["output"],
         current_state=f["state"],
         current_policy=f["policy"],
