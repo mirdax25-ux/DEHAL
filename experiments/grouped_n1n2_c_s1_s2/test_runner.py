@@ -859,7 +859,8 @@ def test_bounded_pass_without_separate_action_authority_is_blocked(tmp_path):
 
 
 def _issue_authority_for_fixture(f, *, secret=ACTION_KEY, **overrides):
-    terminal = b().verify(f["s2"], issuer="S2", kind="terminal")
+    boundary = b()
+    terminal = boundary.verify(f["s2"], issuer="S2", kind="terminal")
     payload = {
         "goal_id": terminal["goal_id"],
         "action_hash": terminal["action_hash"],
@@ -869,7 +870,12 @@ def _issue_authority_for_fixture(f, *, secret=ACTION_KEY, **overrides):
         "execution_token": terminal["execution_token"],
     }
     payload.update(overrides)
-    return r.issue_action_authority(secret, **payload)
+    basis = r.issue_action_basis(
+        secret,
+        basis_root=digest({"source": "external-test-approval", "approval_id": "helper-approval"}),
+        **payload,
+    )
+    return boundary.issue_action_authority(action_basis_receipt=basis)
 
 
 @pytest.mark.parametrize("field,value", [
@@ -896,16 +902,8 @@ def test_action_authority_is_bound_to_exact_execution_context(field, value, tmp_
 
 def test_action_authority_from_wrong_trust_root_is_blocked(tmp_path):
     boundary, f = fx()
-    authority = _issue_authority_for_fixture(f, secret=KEY)
-    assert execute(
-        boundary,
-        action_authority_receipt=authority,
-        output=f["output"],
-        current_state=f["state"],
-        current_policy=f["policy"],
-        action=f["output"]["action"],
-        nonce_ledger=r.FileNonceLedger(tmp_path / "ledger"),
-    ) == "BLOCK"
+    with pytest.raises(ProtocolError):
+        _issue_authority_for_fixture(f, secret=KEY)
 
 
 def test_action_authority_tamper_is_blocked(tmp_path):
@@ -931,17 +929,27 @@ def test_trust_roots_must_be_distinct():
 
 def test_action_authority_derived_only_from_s2_cannot_upgrade_bounded_pass_to_execution(tmp_path):
     boundary, f = fx()
-    external_requirement = {"max_amount": 30}
-    assert f["output"]["action"]["amount"] == 40
-    assert f["output"]["action"]["amount"] > external_requirement["max_amount"]
-    assert f["output"]["terminal_status"] == "PASS"
-    assert f["output"]["global_truth_certified"] is False
+    terminal = boundary.verify(f["s2"], issuer="S2", kind="terminal")
+    assert terminal["terminal_status"] == "PASS"
+    assert terminal["global_truth_certified"] is False
 
-    # Adversarial target: an action authority derived only from the same bounded
-    # S2 result must not upgrade that bounded epistemic PASS into real execution.
+    # Attack: an internally signed capability copied only from S2 context has
+    # no separately authenticated external action basis and must fail closed.
+    forged = boundary.issue(
+        issuer="ACTION-AUTHORITY",
+        kind="capability",
+        payload={
+            "goal_id": terminal["goal_id"],
+            "action_hash": terminal["action_hash"],
+            "state_hash": terminal["state_hash"],
+            "state_version": terminal["state_version"],
+            "contract_hash": terminal["contract_hash"],
+            "execution_token": terminal["execution_token"],
+        },
+    )
     result = execute(
         boundary,
-        action_authority_receipt=f["action_authority"],
+        action_authority_receipt=forged,
         output=f["output"],
         current_state=f["state"],
         current_policy=f["policy"],
