@@ -190,9 +190,10 @@ def issue_evidence_root(
     return {**body, "mac": mac}
 
 
-def issue_action_authority(
+def issue_action_basis(
     action_secret: bytes,
     *,
+    basis_root: str,
     goal_id: str,
     action_hash: str,
     state_hash: str,
@@ -200,9 +201,11 @@ def issue_action_authority(
     contract_hash: str,
     execution_token: str,
 ) -> dict[str, Any]:
-    """Issue a separately grounded capability for one exact external action."""
+    """Model an external/human approval basis from a distinct trust root."""
     if type(action_secret) is not bytes or not action_secret:
         raise ProtocolError("invalid_action_secret")
+    if type(basis_root) is not str or re.fullmatch(r"[a-f0-9]{64}", basis_root) is None:
+        raise ProtocolError("invalid_action_basis_root")
     if not _name(goal_id):
         raise ProtocolError("invalid_action_goal_id")
     for value, error in (
@@ -216,6 +219,7 @@ def issue_action_authority(
     if type(state_version) is not int or state_version < 0:
         raise ProtocolError("invalid_action_state_version")
     payload = {
+        "basis_root": basis_root,
         "goal_id": goal_id,
         "action_hash": action_hash,
         "state_hash": state_hash,
@@ -225,8 +229,8 @@ def issue_action_authority(
     }
     body = {
         "v": VERSION,
-        "issuer": "ACTION-AUTHORITY",
-        "kind": "capability",
+        "issuer": "ACTION-BASIS",
+        "kind": "approval",
         "payload": payload,
     }
     mac = hmac.new(action_secret, canonical(body), hashlib.sha256).hexdigest()
@@ -295,24 +299,26 @@ class TrustedBoundary:
         return deepcopy(payload)
 
 
-    def verify_action_authority(self, receipt: Any) -> dict[str, Any]:
+    def verify_action_basis(self, receipt: Any) -> dict[str, Any]:
         _strict_keys(receipt, ("v", "issuer", "kind", "payload", "mac"))
         if (
             receipt["v"] != VERSION
-            or receipt["issuer"] != "ACTION-AUTHORITY"
-            or receipt["kind"] != "capability"
+            or receipt["issuer"] != "ACTION-BASIS"
+            or receipt["kind"] != "approval"
             or type(receipt["mac"]) is not str
         ):
-            raise ProtocolError("invalid_action_authority_receipt")
+            raise ProtocolError("invalid_action_basis_receipt")
         body = {k: deepcopy(receipt[k]) for k in ("v", "issuer", "kind", "payload")}
         expected = hmac.new(self.action_secret, canonical(body), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(receipt["mac"], expected):
-            raise ProtocolError("action_authority_mac_mismatch")
+            raise ProtocolError("action_basis_mac_mismatch")
         payload = receipt["payload"]
         _strict_keys(
             payload,
-            ("goal_id", "action_hash", "state_hash", "state_version", "contract_hash", "execution_token"),
+            ("basis_root", "goal_id", "action_hash", "state_hash", "state_version", "contract_hash", "execution_token"),
         )
+        if type(payload["basis_root"]) is not str or re.fullmatch(r"[a-f0-9]{64}", payload["basis_root"]) is None:
+            raise ProtocolError("invalid_action_basis_root")
         if not _name(payload["goal_id"]):
             raise ProtocolError("invalid_action_goal_id")
         for value, error in (
@@ -326,6 +332,38 @@ class TrustedBoundary:
         if type(payload["state_version"]) is not int or payload["state_version"] < 0:
             raise ProtocolError("invalid_action_state_version")
         return deepcopy(payload)
+
+    def issue_action_authority(self, *, action_basis_receipt: dict[str, Any] | None) -> dict[str, Any]:
+        if action_basis_receipt is None:
+            raise ProtocolError("action_basis_required")
+        basis = self.verify_action_basis(action_basis_receipt)
+        payload = {
+            **basis,
+            "basis_receipt": deepcopy(action_basis_receipt),
+            "basis_receipt_hash": digest(action_basis_receipt),
+        }
+        return self.issue(issuer="ACTION-AUTHORITY", kind="capability", payload=payload)
+
+    def verify_action_authority(self, receipt: Any) -> dict[str, Any]:
+        payload = self.verify(receipt, issuer="ACTION-AUTHORITY", kind="capability")
+        _strict_keys(
+            payload,
+            (
+                "basis_root", "goal_id", "action_hash", "state_hash", "state_version",
+                "contract_hash", "execution_token", "basis_receipt", "basis_receipt_hash",
+            ),
+        )
+        basis = self.verify_action_basis(payload["basis_receipt"])
+        if digest(payload["basis_receipt"]) != payload["basis_receipt_hash"]:
+            raise ProtocolError("action_basis_hash_mismatch")
+        for key in (
+            "basis_root", "goal_id", "action_hash", "state_hash",
+            "state_version", "contract_hash", "execution_token",
+        ):
+            if payload[key] != basis[key]:
+                raise ProtocolError("action_basis_context_mismatch")
+        return deepcopy(payload)
+
 
     def issue(self, *, issuer: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not _name(issuer) or not _name(kind):
@@ -892,7 +930,7 @@ def execute(
         if action_authority_receipt is None:
             return "BLOCK"
         authority = boundary.verify_action_authority(action_authority_receipt)
-        expected_authority = {
+        expected_context = {
             "goal_id": terminal["goal_id"],
             "action_hash": terminal["action_hash"],
             "state_hash": terminal["state_hash"],
@@ -900,7 +938,7 @@ def execute(
             "contract_hash": terminal["contract_hash"],
             "execution_token": terminal["execution_token"],
         }
-        if authority != expected_authority:
+        if any(authority.get(key) != value for key, value in expected_context.items()):
             return "BLOCK"
         if output["action_hash"] != terminal["action_hash"] or digest(action) != terminal["action_hash"]:
             return "BLOCK"
@@ -963,8 +1001,9 @@ def default_fixture(boundary: TrustedBoundary):
 )
     output = render_readonly(boundary, terminal_receipt=s2, presentation={"text": "Transfer ready."})
     terminal = boundary.verify(s2, issuer="S2", kind="terminal")
-    action_authority = issue_action_authority(
+    action_basis = issue_action_basis(
         boundary.action_secret,
+        basis_root=digest({"source": "external-test-approval", "approval_id": "fixture-approval-1"}),
         goal_id=terminal["goal_id"],
         action_hash=terminal["action_hash"],
         state_hash=terminal["state_hash"],
@@ -972,7 +1011,8 @@ def default_fixture(boundary: TrustedBoundary):
         contract_hash=terminal["contract_hash"],
         execution_token=terminal["execution_token"],
     )
+    action_authority = boundary.issue_action_authority(action_basis_receipt=action_basis)
     return {"state": state, "policy": policy, "anchor": anchor, "transition": transition,
             "initial": initial, "exchanges": exchanges, "loop": loop, "final_n2": final_receipt,
             "checkpoint": checkpoint, "s1": s1, "s2": s2, "output": output,
-            "action_authority": action_authority}
+            "action_basis": action_basis, "action_authority": action_authority}
