@@ -45,7 +45,7 @@ def test_fuzz_executor_rejects_random_action_mutation(seed, tmp_path):
         action["type"] = "a_" + rand_text(rng, 8)
     else:
         action["memo"] = "m_" + rand_text(rng, 12)
-    assert r.execute(b, action_authority_receipt=f["action_authority"], output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert r.execute(b, action_authority_receipt=f["action_authority"], current_action_basis_root=f["action_basis"]["payload"]["basis_root"], output=f["output"], current_state=f["state"], current_policy=f["policy"], action=action, nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -60,7 +60,7 @@ def test_fuzz_executor_rejects_random_state_mutation(seed, tmp_path):
         state["balance"] += rng.randint(1, 100)
     else:
         state["verified_recipients"] = ["alice", "u_" + rand_text(rng, 8)]
-    assert r.execute(b, action_authority_receipt=f["action_authority"], output=f["output"], current_state=state, current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert r.execute(b, action_authority_receipt=f["action_authority"], current_action_basis_root=f["action_basis"]["payload"]["basis_root"], output=f["output"], current_state=state, current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -88,7 +88,7 @@ def test_fuzz_terminal_receipt_tamper_never_executes(seed, tmp_path):
         receipt["payload"]["state_version"] += rng.randint(1, 20)
     elif choice == "execution_token":
         receipt["payload"]["execution_token"] = "nonce_" + rand_text(rng, 10)
-    assert r.execute(b, action_authority_receipt=f["action_authority"], output=out, current_state=f["state"], current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
+    assert r.execute(b, action_authority_receipt=f["action_authority"], current_action_basis_root=f["action_basis"]["payload"]["basis_root"], output=out, current_state=f["state"], current_policy=f["policy"], action=f["output"]["action"], nonce_ledger=r.FileNonceLedger(tmp_path / "ledger")) == "BLOCK"
 
 
 @pytest.mark.parametrize("seed", SEEDS)

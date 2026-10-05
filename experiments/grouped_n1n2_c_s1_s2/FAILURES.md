@@ -161,3 +161,31 @@ A valid transition, intact checkpoint, PASS S1, PASS S2 implementation and exact
 **Regression test:** `test_bounded_pass_without_global_truth_still_executes_real_action_red` reproduces EXECUTED where the safety target is BLOCK. It is strict xfail while F12 remains open so the vulnerability cannot silently disappear from the suite.
 
 **Version change:** none yet. 0.1.8 remains current; F12 is OPEN and no fix/READY claim is allowed.
+
+
+## F13 — action authority lacked a separately grounded external basis
+
+**Failure mode:** A capability derived from the same bounded S2 context could be mistaken for independent authority to execute a real side effect.
+
+**Root cause:** The action-authority path did not require a separately authenticated external/human approval basis before capability issuance.
+
+**Guardrail:** Version 0.1.9 introduced ACTION-BASIS receipts under the distinct action trust root. ACTION-AUTHORITY must embed a verified basis receipt and bind its basis_root plus the exact goal/action/state/policy/execution context.
+
+**Regression tests:** action-authority independence, wrong trust root, tamper, and exact execution-context binding tests in test_runner.py.
+
+**Version change:** experiment 0.1.8 -> **0.1.9**.
+
+
+## F14 — stale action authority survived external basis rotation
+
+**Failure mode:** A valid action-authority capability could remain executable after the external approval basis had rotated or been revoked, provided goal/action/state/policy remained unchanged.
+
+**Root cause:** execute() verified the historical ACTION-BASIS receipt embedded in the authority capability but had no trusted input representing the external authority's current basis_root. Revocation/rotation after issuance was therefore invisible at execution time.
+
+**Guardrail:** Version 0.1.10 requires current_action_basis_root at execute(). Missing, malformed, or non-matching current basis identity returns BLOCK before nonce consumption.
+
+**Regression tests:** test_rotated_external_action_basis_invalidates_old_authority and test_missing_current_action_basis_fails_closed.
+
+**Version change:** experiment 0.1.9 -> **0.1.10**.
+
+**Post-action verification:** pending GitHub CI observation; no GREEN claim is made by this file alone.

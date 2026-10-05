@@ -10,7 +10,7 @@ N1 <-> N2 -> N2(final) -> C -> S1 -> S2 -> N1(read-only) -> OUTPUT
 
 ## Validation
 
-Current experiment version: **0.1.8**
+Current experiment version: **0.1.10 candidate**
 
 Preparation environment:
 - python -m pytest experiments/grouped_n1n2_c_s1_s2 --tb=short
@@ -35,7 +35,7 @@ The combined pre-existing repository tests plus this experiment were also run lo
 4. S1 and S2 have different responsibilities and both operate on the same checkpoint identity.
 5. S2 does not infer global-goal PASS from contract PASS.
 6. Final N1 is presentation-only.
-7. Execution requires the exact S2 receipt, action hash, state hash/version, current-policy hash/semantics and the S2-derived stable execution token recorded in a trusted file-backed ledger.
+7. Execution requires the exact S2 receipt, action hash, state hash/version, current-policy hash/semantics, the currently trusted external action-basis root, and the S2-derived stable execution token recorded in a trusted file-backed ledger.
 
 ## Confirmed failure fixed during implementation
 
@@ -100,3 +100,14 @@ A RED regression reproduced the remaining common-mode specification failure: all
 Version 0.1.8 therefore hardens the claim boundary instead of adding a fake extra verifier. S2 receipts and read-only output now state `epistemic_scope=authenticated_inputs_and_declared_requirements_only` and `global_truth_certified=false`. The executor requires those exact certified fields, so N1/presentation cannot upgrade bounded PASS into a claim of universal truth.
 
 Residual semantic completeness remains UNKNOWN unless grounded outside the same trust chain.
+
+
+## Confirmed F13 failure fixed
+
+An internally valid action-authority capability was not enough to prove that authority came from an independently grounded external approval basis. Version 0.1.9 introduced a separately authenticated ACTION-BASIS receipt and required ACTION-AUTHORITY to embed and verify that basis before execution.
+
+## Confirmed F14 failure fixed
+
+A previously valid action-authority capability could remain executable after the external approval basis rotated or was revoked, because execute() had no input representing the authority's current basis identity. Version 0.1.10 requires current_action_basis_root at the execution boundary and fails closed when it is missing, malformed, or different from the basis_root bound into the authority receipt. Regressions cover both external-basis rotation and omission of the current basis root.
+
+GitHub CI status for 0.1.10 is not claimed until the post-action run is observed.

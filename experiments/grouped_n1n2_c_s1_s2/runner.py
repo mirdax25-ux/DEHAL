@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-VERSION = "0.1.9"
+VERSION = "0.1.10"
 STATUS_ORDER = {"PASS": 0, "UNKNOWN": 1, "BLOCK": 2, "CONFLICT": 3}
 TERMINAL_STATUSES = frozenset(STATUS_ORDER)
 
@@ -909,6 +909,7 @@ def execute(
     current_policy: dict[str, Any],
     action: dict[str, Any],
     action_authority_receipt: dict[str, Any] | None = None,
+    current_action_basis_root: str | None = None,
     nonce_ledger: FileNonceLedger,
 ) -> str:
     try:
@@ -930,6 +931,12 @@ def execute(
         if action_authority_receipt is None:
             return "BLOCK"
         authority = boundary.verify_action_authority(action_authority_receipt)
+        if (
+            type(current_action_basis_root) is not str
+            or re.fullmatch(r"[a-f0-9]{64}", current_action_basis_root) is None
+            or authority.get("basis_root") != current_action_basis_root
+        ):
+            return "BLOCK"
         expected_context = {
             "goal_id": terminal["goal_id"],
             "action_hash": terminal["action_hash"],

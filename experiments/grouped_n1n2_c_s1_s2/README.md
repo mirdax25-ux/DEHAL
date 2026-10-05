@@ -30,7 +30,7 @@ The experiment does **not** call an LLM and does not claim universal correctness
 - S1 checks checkpoint, transition, current state/policy and provenance bindings. It does not decide the global semantic goal.
 - S2 independently checks the concrete action/policy, global-goal anchor and S1 receipt. It emits the only terminal receipt.
 - Final N1 is read-only presentation: it controls only explanation text. Trusted status/action fields are copied directly from S2.
-- Executor accepts only the S2 terminal receipt, exact action hash, exact current-state hash/version, exact current-policy hash/semantics, and an S2-derived stable execution token consumed through a trusted file-backed ledger.
+- Executor accepts only the S2 terminal receipt, exact action hash, exact current-state hash/version, exact current-policy hash/semantics, the currently trusted external action-basis root, and an S2-derived stable execution token consumed through a trusted file-backed ledger. Missing or rotated action-basis identity fails closed.
 
 ## Bounded status semantics
 
@@ -45,7 +45,7 @@ python -m pytest -q experiments/grouped_n1n2_c_s1_s2/test_runner.py experiments/
 python -m compileall -q experiments/grouped_n1n2_c_s1_s2
 ```
 
-Experiment version **0.1.8** currently has **444 passing experiment tests** in the local isolated environment: the prior 441 plus 3 specification-scope regressions. The combined existing repository suite plus this experiment has **739 passing tests** locally. Hosted GitHub CI is not claimed until separately observed.
+Experiment version **0.1.10 candidate** adds fail-closed execution-time revalidation of the current external action-basis root after the F14 RED rotation attack. Historical 0.1.8 local counts were 444 experiment tests and 739 combined tests; they are not carried forward as current 0.1.10 evidence. Current GitHub CI must be observed separately.
 
 ## Explicit limitations
 
