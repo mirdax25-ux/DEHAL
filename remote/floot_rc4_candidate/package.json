@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "name": "bodulhal-rc4-local-soak",
+  "version": "0.0.0",
+  "scripts": {
+    "test:core": "vitest run helpers/BodulHalCore.spec.tsx helpers/McpGuardTool.spec.tsx --globals"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9",
+    "typescript": "^5.6.3"
+  }
+}
