@@ -7,6 +7,8 @@ import pathlib
 import subprocess
 import time
 
+RUNNER_VERSION = "1.0.1"  # Fix: never truncate an in-flight iteration at soak deadline.
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--command", required=True, help="Existing verified test command (shell syntax)")
@@ -34,7 +36,8 @@ def main():
                 if not argv:
                     raise ValueError("Empty test command")
                 try:
-                    result = subprocess.run(argv, capture_output=True, text=True, timeout=max(1, min(1800, deadline - time.monotonic())))
+                    # Deadline stops new iterations, not a test already started.
+                    result = subprocess.run(argv, capture_output=True, text=True, timeout=1800)
                     rc = result.returncode
                     stdout, stderr = result.stdout[-12000:], result.stderr[-12000:]
                 except subprocess.TimeoutExpired as e:
@@ -54,7 +57,7 @@ def main():
         with (out / "error.txt").open("w", encoding="utf-8") as f:
             f.write(repr(e))
     finished = dt.datetime.now(dt.timezone.utc)
-    report = {"status": status, "started_utc": started.isoformat(), "finished_utc": finished.isoformat(), "duration_seconds": (finished-started).total_seconds(), "target_hours": args.hours, "iterations": count, "failures": failures, "command": args.command}
+    report = {"runner_version": RUNNER_VERSION, "status": status, "started_utc": started.isoformat(), "finished_utc": finished.isoformat(), "duration_seconds": (finished-started).total_seconds(), "target_hours": args.hours, "iterations": count, "failures": failures, "command": args.command}
     (out / "summary.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
     return 0 if status == "PASS" else 1
