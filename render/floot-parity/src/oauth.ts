@@ -6,11 +6,11 @@
  */
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey, type JWTPayload } from "jose";
 
-export const OAUTH_RESOURCE = "https://brutala-hal.onrender.com/oauth/mcp";
+export const OAUTH_RESOURCE = "https://bodulhal-oauth-stage.onrender.com/oauth/mcp";
 export const OAUTH_ISSUER = "https://xqoxcqkpzweclpqliqwn.supabase.co/auth/v1";
 export const OAUTH_JWKS = OAUTH_ISSUER + "/.well-known/jwks.json";
 export const OAUTH_METADATA_PATH = "/.well-known/oauth-protected-resource/oauth/mcp";
-export const OAUTH_METADATA_URL = "https://brutala-hal.onrender.com" + OAUTH_METADATA_PATH;
+export const OAUTH_METADATA_URL = "https://bodulhal-oauth-stage.onrender.com" + OAUTH_METADATA_PATH;
 
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const ALGORITHMS = ["RS256", "ES256"];
