@@ -1,0 +1,19 @@
+{
+  "name": "bodulhal-floot-parity-render",
+  "version": "1.2.0-rc.4",
+  "private": true,
+  "type": "module",
+  "description": "Private parity deployment for existing Floot BodulHal MCP, fails closed without staging token",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test": "npm run build && node --test tests/*.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.0",
+    "typescript": "~5.9.3"
+  }
+}
