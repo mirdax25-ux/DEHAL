@@ -6,7 +6,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { health } from "./BodulHalCore.js";
 import { handle as flootMcpHandler } from "./mcp_floot.js";
-import { OAuthVerifier, OAUTH_METADATA_PATH, oauthChallenge, protectedResourceMetadata } from "./oauth.js";
+import { OAuthVerifier, OAUTH_METADATA_PATH, OAUTH_ISSUER, OAUTH_RESOURCE, oauthChallenge, protectedResourceMetadata } from "./oauth.js";
 
 const MAX_BODY = 256 * 1024;
 
@@ -51,15 +51,15 @@ export function createProtectedHalServer(secret: string, oauthVerifier: OAuthVer
       return;
     }
     if (url === OAUTH_METADATA_PATH) {
-      if (!oauthVerifier) {
-        respond(res, 404, { error: "not_found" });
-        return;
-      }
+      // Public OAuth metadata is safe to serve before client registration.
+      // The /oauth/mcp route remains completely inaccessible without a verifier.
       if (req.method !== "GET") {
         respond(res, 405, { error: "method_not_allowed" }, { "Allow": "GET" });
         return;
       }
-      respond(res, 200, protectedResourceMetadata(oauthVerifier.configuration));
+      respond(res, 200, protectedResourceMetadata({
+        issuer: OAUTH_ISSUER, resource: OAUTH_RESOURCE, allowedClientIds: [],
+      }));
       return;
     }
 
@@ -70,9 +70,11 @@ export function createProtectedHalServer(secret: string, oauthVerifier: OAuthVer
       return;
     }
     if (oauthRoute) {
-      // A missing client allowlist disables the endpoint entirely.
+      // Discovery works without a client, but access fails closed until a
+      // genuine registered OAuth client ID is explicitly allowlisted.
       if (!oauthVerifier) {
-        respond(res, 404, { error: "not_found" });
+        respond(res, 401, { error: "authentication_required" },
+          { "WWW-Authenticate": oauthChallenge() });
         return;
       }
       try {
