@@ -1,0 +1,23 @@
+name: render-floot-parity
+on:
+  push:
+    branches:
+      - deploy/bodulhal-floot-parity-render-20261012
+  pull_request:
+    paths:
+      - 'render/floot-parity/**'
+      - '.github/workflows/render-floot-parity.yml'
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: render/floot-parity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
