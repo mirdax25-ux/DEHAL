@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - deploy/bodulhal-floot-parity-render-20261012
+      - feature/bodulhal-oauth-guard-20261012
   pull_request:
     paths:
       - 'render/floot-parity/**'
