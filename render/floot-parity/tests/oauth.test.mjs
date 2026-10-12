@@ -59,11 +59,20 @@ test("OAuth disabled unless valid client allowlist is configured",()=>{
   assert.deepEqual(conf,CONFIG);
 });
 
-test("OAuth URI and metadata inaccessible when unconfigured",async()=>{
+test("OAuth metadata is discoverable while unregistered clients remain blocked",async()=>{
   await withServer(null,async base=>{
-    assert.equal((await fetch(base+"/oauth/mcp")).status,404);
-    assert.equal((await fetch(base+OAUTH_METADATA_PATH)).status,404);
-    const old=await fetch(base+"/mcp");assert.equal(old.status,401);
+    const noToken = await fetch(base+"/oauth/mcp");
+    assert.equal(noToken.status,401);
+    assert.match(noToken.headers.get("www-authenticate"),/resource_metadata=/);
+    assert.equal((await fetchOauth(base,"Bearer "+SECRET)).status,401,
+      "legacy bearer must never authenticate OAuth");
+    const meta=await fetch(base+OAUTH_METADATA_PATH);
+    assert.equal(meta.status,200);
+    const body=await meta.json();
+    assert.equal(body.resource,OAUTH_RESOURCE);
+    assert.deepEqual(body.authorization_servers,[OAUTH_ISSUER]);
+    assert.equal(Object.hasOwn(body,"client_secret"),false);
+    const legacy=await fetch(base+"/mcp");assert.equal(legacy.status,401);
   });
 });
 
