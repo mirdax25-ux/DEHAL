@@ -71,7 +71,7 @@ test("OAuth 401 supplies RFC9728 resource metadata and no client credentials",as
   await withServer(oauthVerifier,async base=>{
     const denied=await fetchOauth(base);
     assert.equal(denied.status,401);
-    assert.match(denied.headers.get("www-authenticate"),/resource_metadata="https:\/\/brutala-hal\.onrender\.com\/\.well-known\/oauth-protected-resource\/oauth\/mcp"/);
+    assert.match(denied.headers.get("www-authenticate"),/resource_metadata="https:\/\/bodulhal-oauth-stage\.onrender\.com\/\.well-known\/oauth-protected-resource\/oauth\/mcp"/);
     const meta=await fetch(base+OAUTH_METADATA_PATH);
     assert.equal(meta.status,200);
     const json=await meta.json();
