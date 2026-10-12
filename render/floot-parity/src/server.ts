@@ -6,6 +6,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { health } from "./BodulHalCore.js";
 import { handle as flootMcpHandler } from "./mcp_floot.js";
+import { OAuthVerifier, OAUTH_METADATA_PATH, oauthChallenge, protectedResourceMetadata } from "./oauth.js";
 
 const MAX_BODY = 256 * 1024;
 
@@ -37,7 +38,7 @@ async function readBoundedBody(req: IncomingMessage): Promise<Buffer | null> {
   return Buffer.concat(chunks);
 }
 
-export function createProtectedHalServer(secret: string) {
+export function createProtectedHalServer(secret: string, oauthVerifier: OAuthVerifier | null = null) {
   if (typeof secret !== "string" || secret.length < 32) {
     throw new Error("BODULHAL_STAGING_TOKEN (minimum 32 characters) is required");
   }
@@ -46,14 +47,43 @@ export function createProtectedHalServer(secret: string) {
     const url = (req.url ?? "").split("?")[0];
     if (req.method === "GET" && url === "/health") {
       // Core fingerprint stays original; deployment authentication is accurate.
-      respond(res, 200, { ...health(), authentication: "staging-bearer", deployment: "render-protected-staging" });
+      respond(res, 200, { ...health(), authentication: "staging-bearer", deployment: "render-protected-staging", oauth_endpoint: oauthVerifier ? "configured" : "disabled" });
       return;
     }
-    if (url !== "/mcp" && url !== "/_api/mcp") {
+    if (url === OAUTH_METADATA_PATH) {
+      if (!oauthVerifier) {
+        respond(res, 404, { error: "not_found" });
+        return;
+      }
+      if (req.method !== "GET") {
+        respond(res, 405, { error: "method_not_allowed" }, { "Allow": "GET" });
+        return;
+      }
+      respond(res, 200, protectedResourceMetadata(oauthVerifier.configuration));
+      return;
+    }
+
+    const oauthRoute = url === "/oauth/mcp";
+    const stagingRoute = url === "/mcp" || url === "/_api/mcp";
+    if (!oauthRoute && !stagingRoute) {
       respond(res, 404, { error: "not_found" });
       return;
     }
-    if (!authorized(req.headers.authorization, secret)) {
+    if (oauthRoute) {
+      // A missing client allowlist disables the endpoint entirely.
+      if (!oauthVerifier) {
+        respond(res, 404, { error: "not_found" });
+        return;
+      }
+      try {
+        await oauthVerifier.verify(req.headers.authorization);
+      } catch {
+        respond(res, 401, { error: "authentication_required" },
+          { "WWW-Authenticate": oauthChallenge() });
+        return;
+      }
+    } else if (!authorized(req.headers.authorization, secret)) {
+      // Old staging bearer is never accepted on /oauth/mcp.
       respond(res, 401, { error: "authentication_required" }, { "WWW-Authenticate": 'Bearer realm="BodulHal staging"' });
       return;
     }
