@@ -71,7 +71,7 @@ export function createProtectedHalServer(secret: string) {
       const request = new Request("http://127.0.0.1/_api/mcp", {
         method: "POST",
         headers: { "content-type": req.headers["content-type"] ?? "application/json" },
-        body: bytes,
+        body: bytes.toString("utf8"),
       });
       const response = await flootMcpHandler(request);
       // Preserve JSON-RPC success/error semantics from the original Floot handler.
