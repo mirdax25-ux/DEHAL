@@ -50,6 +50,7 @@ export function oauthChallenge(): string {
 
 export class OAuthVerifier {
   private readonly resolver: JWTVerifyGetKey;
+  get configuration(): OAuthConfig { return this.config; }
   constructor(private readonly config: OAuthConfig, localResolver?: JWTVerifyGetKey) {
     if (config.issuer !== OAUTH_ISSUER || config.resource !== OAUTH_RESOURCE ||
         !config.allowedClientIds.length ||
