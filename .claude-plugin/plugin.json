@@ -1,3 +1,8 @@
 {
-  "name": "evidence-validator"
+  "name": "evidence-validator",
+  "version": "0.1.0",
+  "description": "Evidence-first validation of AI and agent claims using deterministic checks.",
+  "author": {
+    "name": "mirdax25-ux"
+  }
 }
