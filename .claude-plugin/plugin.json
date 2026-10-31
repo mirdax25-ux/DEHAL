@@ -4,5 +4,6 @@
   "description": "Evidence-first validation of AI and agent claims using deterministic checks.",
   "author": {
     "name": "mirdax25-ux"
-  }
+  },
+  "license": "Apache-2.0"
 }
