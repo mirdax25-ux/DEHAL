@@ -391,6 +391,16 @@ def collect_normalize_evidence(
         raise TypeError("records_by_atom must be object")
     if not isinstance(known_atom_ids, set):
         raise TypeError("known_atom_ids must be set")
+    if any(
+        not isinstance(atom_id, str) or not atom_id.strip()
+        for atom_id in known_atom_ids
+    ):
+        raise TypeError("known_atom_ids must contain non-empty strings")
+    if any(
+        not isinstance(atom_id, str) or not atom_id.strip()
+        for atom_id in records_by_atom
+    ):
+        raise TypeError("records_by_atom keys must be non-empty strings")
 
     unknown = sorted(set(records_by_atom) - known_atom_ids)
     if unknown:
@@ -408,6 +418,8 @@ def collect_normalize_evidence(
         for index, raw in enumerate(raw_items):
             path = f"evidence_by_atom.{atom_id}[{index}]"
             obj = _record_mapping(raw, path)
+            if any(not isinstance(key, str) for key in obj):
+                raise TypeError(f"{path} keys must be strings")
 
             extra = sorted(set(obj) - _ALLOWED_EVIDENCE_KEYS)
             if extra:
@@ -526,12 +538,21 @@ def verify_model_response(
     ingestion = ingest_model_response(raw, authority=authority)
     atom_ids = {atom.atom_id for atom in ingestion.atoms}
 
+    if not isinstance(evidence_by_atom, Mapping):
+        raise TypeError("evidence_by_atom must be object")
     evidence = collect_normalize_evidence(
         evidence_by_atom,
         known_atom_ids=atom_ids,
     )
 
-    approvals = human_approvals or {}
+    if human_approvals is not None and not isinstance(human_approvals, Mapping):
+        raise TypeError("human_approvals must be object")
+    approvals = human_approvals if human_approvals is not None else {}
+    if any(
+        not isinstance(atom_id, str) or not atom_id.strip()
+        for atom_id in approvals
+    ):
+        raise TypeError("human_approvals keys must be non-empty strings")
     unknown_approvals = sorted(set(approvals) - atom_ids)
     if unknown_approvals:
         raise ValueError(

@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from bodulskihal_core import Classification, Policy, Verdict
-from bodulskihal_core.ingestion import (
+from b_1_2_core import Classification, Policy, Verdict
+from b_1_2_core.ingestion import (
     TypeAuthority,
     collect_normalize_evidence,
     verify_model_response,

@@ -29,9 +29,9 @@ def _env_value(name: str) -> str:
 
 
 def current_runtime_provenance() -> RuntimeProvenance:
-    source_commit = _env_value("BODULSKIHAL_SOURCE_COMMIT")
-    source_ref = _env_value("BODULSKIHAL_SOURCE_REF")
-    build_id = _env_value("BODULSKIHAL_BUILD_ID")
+    source_commit = _env_value("B_1_2_SOURCE_COMMIT")
+    source_ref = _env_value("B_1_2_SOURCE_REF")
+    build_id = _env_value("B_1_2_BUILD_ID")
 
     commit_verified = bool(_GIT_DIGEST.fullmatch(source_commit))
     verified = (

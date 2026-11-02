@@ -2,7 +2,7 @@ import unicodedata
 
 import pytest
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim,
     ClaimType,
     Classification,
@@ -12,7 +12,7 @@ from bodulskihal_core import (
     Verdict,
     verify_claim,
 )
-from bodulskihal_core.ingestion import (
+from b_1_2_core.ingestion import (
     TypeAuthority,
     atomize_model_response,
     build_evidence_contract,

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from pprint import pprint
 
-from bodulskihal_core import evaluate_benchmark
+from b_1_2_core import evaluate_benchmark
 
 
 root = Path(__file__).parent

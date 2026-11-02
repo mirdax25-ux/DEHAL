@@ -157,6 +157,16 @@ def _validate_non_empty_string(value: object, field_name: str) -> None:
 def _validate_provenance_inputs(
     claim: Claim, evidence: Sequence[Evidence], policy: Policy
 ) -> None:
+    if not isinstance(claim, Claim):
+        raise TypeError("claim must be Claim")
+    if not isinstance(policy, Policy):
+        raise TypeError("policy must be Policy")
+    if not isinstance(claim.claim_type, ClaimType):
+        raise TypeError("claim.claim_type must be ClaimType")
+    if not isinstance(claim.risk, RiskLevel):
+        raise TypeError("claim.risk must be RiskLevel")
+    if type(claim.consequential) is not bool:
+        raise TypeError("claim.consequential must be bool")
     _validate_non_empty_string(claim.claim_id, "claim_id")
     _validate_non_empty_string(claim.text, "claim.text")
     _validate_non_empty_string(policy.version, "policy.version")
@@ -165,7 +175,13 @@ def _validate_provenance_inputs(
     if not isinstance(claim.answerability, AnswerabilityStatus):
         raise TypeError("claim.answerability must be AnswerabilityStatus")
     for item in evidence:
+        if not isinstance(item, Evidence):
+            raise TypeError("evidence items must be Evidence")
         _validate_non_empty_string(item.source_id, "evidence.source_id")
+        if not isinstance(item.directness, Directness):
+            raise TypeError("evidence.directness must be Directness")
+        if not isinstance(item.source_role, SourceRole):
+            raise TypeError("evidence.source_role must be SourceRole")
         if not isinstance(item.origin, EvidenceOrigin):
             raise TypeError("evidence.origin must be EvidenceOrigin")
         if not isinstance(item.authority_scope, AuthorityScope):
@@ -176,24 +192,42 @@ def _validate_provenance_inputs(
 def _validate_common_inputs(
     evidence: Sequence[Evidence], *, policy: Policy, evaluation_time: datetime
 ) -> None:
+    if not isinstance(evaluation_time, datetime):
+        raise TypeError("evaluation_time must be datetime")
     if not _is_aware(evaluation_time):
         raise ValueError("evaluation_time must be timezone-aware")
+    if isinstance(policy.max_age_seconds, bool) or not isinstance(
+        policy.max_age_seconds, int
+    ):
+        raise TypeError("max_age_seconds must be int")
     if policy.max_age_seconds < 0:
         raise ValueError("max_age_seconds must be non-negative")
+    if isinstance(policy.medium_risk_min_independent_sources, bool) or not isinstance(
+        policy.medium_risk_min_independent_sources, int
+    ):
+        raise TypeError("medium_risk_min_independent_sources must be int")
     if policy.medium_risk_min_independent_sources < 1:
         raise ValueError("medium_risk_min_independent_sources must be at least 1")
+    if type(policy.reject_future_evidence) is not bool:
+        raise TypeError("reject_future_evidence must be bool")
+    if type(policy.require_independent_action_evidence) is not bool:
+        raise TypeError("require_independent_action_evidence must be bool")
     if type(policy.require_runtime_provenance) is not bool:
         raise TypeError("require_runtime_provenance must be bool")
     for item in evidence:
+        if not isinstance(item.observed_at, datetime):
+            raise TypeError("observed_at must be datetime")
         if not _is_aware(item.observed_at):
             raise ValueError("observed_at must be timezone-aware")
-        if item.evidence_id is not None and not item.evidence_id.strip():
-            raise ValueError("evidence_id must be non-empty when supplied")
-        if item.source_ref is not None and not item.source_ref.strip():
-            raise ValueError("source_ref must be non-empty when supplied")
-        if item.independence_group is not None and not item.independence_group.strip():
-            raise ValueError("independence_group must be non-empty when supplied")
+        for field_name in ("evidence_id", "source_ref", "independence_group"):
+            value = getattr(item, field_name)
+            if value is not None and not isinstance(value, str):
+                raise TypeError(f"{field_name} must be string when supplied")
+            if value is not None and not value.strip():
+                raise ValueError(f"{field_name} must be non-empty when supplied")
         if item.content_sha256 is not None:
+            if not isinstance(item.content_sha256, str):
+                raise TypeError("content_sha256 must be string when supplied")
             digest = item.content_sha256.lower()
             if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
                 raise ValueError("content_sha256 must be a 64-character hexadecimal SHA-256")
@@ -219,9 +253,9 @@ def _validate_evidence_identity(evidence: Sequence[Evidence]) -> None:
 
 def _is_fresh(item: Evidence, *, policy: Policy, evaluation_time: datetime) -> bool:
     age = (evaluation_time - item.observed_at).total_seconds()
-    if policy.reject_future_evidence and age < 0:
-        return False
-    return 0 <= age <= policy.max_age_seconds
+    if age < 0:
+        return not policy.reject_future_evidence
+    return age <= policy.max_age_seconds
 
 
 def _eligible_evidence(
@@ -530,7 +564,8 @@ def _make_receipt(
             else current_runtime_provenance().as_dict()
         ),
         "gates": {
-            "eligible_source_count": len(eligible),
+            "eligible_source_count": len({item.source_id.strip() for item in eligible}),
+            "eligible_evidence_count": len(eligible),
             "supporting_sources": supporting_sources,
             "contradicting_sources": contradicting_sources,
             "supporting_evidence_ids": supporting_evidence_ids,
@@ -647,20 +682,50 @@ def verify_claim(
 
 
 def verify_compound(
-    claims: Sequence[Claim],
+    claims: Iterable[Claim],
     evidence_by_claim: Mapping[str, Iterable[Evidence]],
     *,
     policy: Policy,
     evaluation_time: datetime,
     human_approvals: Mapping[str, bool] | None = None,
 ) -> CompoundResult:
+    try:
+        claims = tuple(claims)
+    except TypeError as exc:
+        raise TypeError("claims must be iterable") from exc
     if not claims:
         raise ValueError("at least one claim is required")
+    if not isinstance(evidence_by_claim, Mapping):
+        raise TypeError("evidence_by_claim must be a mapping")
+    if human_approvals is not None and not isinstance(human_approvals, Mapping):
+        raise TypeError("human_approvals must be a mapping")
+    if any(not isinstance(claim, Claim) for claim in claims):
+        raise TypeError("claims must contain Claim values")
     claim_ids = [claim.claim_id for claim in claims]
+    for claim_id in claim_ids:
+        _validate_non_empty_string(claim_id, "claim_id")
     if len(claim_ids) != len(set(claim_ids)):
         raise ValueError("duplicate claim_id")
 
     approvals = human_approvals or {}
+    for mapping_name, mapping in (
+        ("evidence_by_claim", evidence_by_claim),
+        ("human_approvals", approvals),
+    ):
+        for claim_id in mapping:
+            _validate_non_empty_string(claim_id, f"{mapping_name} claim id")
+    unknown_evidence_ids = set(evidence_by_claim) - set(claim_ids)
+    if unknown_evidence_ids:
+        raise ValueError(
+            "evidence_by_claim contains unknown claim id: "
+            + ", ".join(sorted(unknown_evidence_ids))
+        )
+    unknown_approval_ids = set(approvals) - set(claim_ids)
+    if unknown_approval_ids:
+        raise ValueError(
+            "human_approvals contains unknown claim id: "
+            + ", ".join(sorted(unknown_approval_ids))
+        )
     for approval_claim_id, approval in approvals.items():
         _validate_human_approval(
             approval,

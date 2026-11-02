@@ -1,5 +1,5 @@
 def test_raw_pipeline_symbols_are_exported_from_package():
-    from bodulskihal_core import (
+    from b_1_2_core import (
         AtomStatus,
         ClaimAtom,
         EvidenceContract,

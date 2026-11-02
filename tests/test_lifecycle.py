@@ -1,5 +1,5 @@
-from bodulskihal_core import Verdict, canonical_receipt_sha256
-from bodulskihal_core.lifecycle import (
+from b_1_2_core import Verdict, canonical_receipt_sha256
+from b_1_2_core.lifecycle import (
     ProjectState,
     authorize_mutation,
     freeze_project,
@@ -9,7 +9,7 @@ from bodulskihal_core.lifecycle import (
 
 def test_freeze_requires_verified_checkpoint():
     result = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         checkpoint_digest="sha256:abc",
         checkpoint_verified=False,
@@ -24,7 +24,7 @@ def test_freeze_requires_verified_checkpoint():
 
 def test_freeze_requires_human_approval():
     result = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         checkpoint_digest="sha256:abc",
         checkpoint_verified=True,
@@ -39,7 +39,7 @@ def test_freeze_requires_human_approval():
 
 def test_verified_human_approved_freeze_moves_to_frozen():
     result = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         checkpoint_digest="sha256:abc",
         checkpoint_verified=True,
@@ -60,7 +60,7 @@ def test_verified_human_approved_freeze_moves_to_frozen():
 
 def test_freezing_same_checkpoint_is_idempotent():
     result = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.FROZEN,
         checkpoint_digest="sha256:abc",
         current_checkpoint_digest="sha256:abc",
@@ -76,7 +76,7 @@ def test_freezing_same_checkpoint_is_idempotent():
 
 def test_frozen_project_rejects_different_checkpoint_through_freeze_path():
     result = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.FROZEN,
         checkpoint_digest="sha256:new",
         current_checkpoint_digest="sha256:old",
@@ -92,7 +92,7 @@ def test_frozen_project_rejects_different_checkpoint_through_freeze_path():
 
 def test_frozen_scope_blocks_normal_mutation():
     result = authorize_mutation(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.FROZEN,
         policy_version="2.0",
     )
@@ -103,7 +103,7 @@ def test_frozen_scope_blocks_normal_mutation():
 
 def test_active_scope_allows_normal_mutation():
     result = authorize_mutation(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         policy_version="2.0",
     )
@@ -114,7 +114,7 @@ def test_active_scope_allows_normal_mutation():
 
 def test_reopen_requires_human_approval():
     result = reopen_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.FROZEN,
         checkpoint_digest="sha256:abc",
         reopen_reason="verified defect requires repair",
@@ -130,7 +130,7 @@ def test_reopen_requires_human_approval():
 def test_reopen_requires_recorded_reason():
     try:
         reopen_project(
-            project_id="bodulskihal",
+            project_id="b-1-2",
             current_state=ProjectState.FROZEN,
             checkpoint_digest="sha256:abc",
             reopen_reason="",
@@ -145,7 +145,7 @@ def test_reopen_requires_recorded_reason():
 
 def test_human_approved_reopen_moves_to_active_and_records_reason():
     result = reopen_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.FROZEN,
         checkpoint_digest="sha256:abc",
         reopen_reason="verified defect requires repair",
@@ -165,7 +165,7 @@ def test_human_approved_reopen_moves_to_active_and_records_reason():
 
 def test_reopen_from_active_is_rejected():
     result = reopen_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         checkpoint_digest="sha256:abc",
         reopen_reason="not applicable",
@@ -180,7 +180,7 @@ def test_reopen_from_active_is_rejected():
 
 def test_lifecycle_receipts_are_deterministic_for_same_inputs():
     a = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         checkpoint_digest="sha256:abc",
         checkpoint_verified=True,
@@ -188,7 +188,7 @@ def test_lifecycle_receipts_are_deterministic_for_same_inputs():
         policy_version="2.0",
     )
     b = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         checkpoint_digest="sha256:abc",
         checkpoint_verified=True,
@@ -201,7 +201,7 @@ def test_lifecycle_receipts_are_deterministic_for_same_inputs():
 
 def test_lifecycle_receipt_contains_verifiable_canonical_sha256():
     result = freeze_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.ACTIVE,
         checkpoint_digest="sha256:abc",
         checkpoint_verified=True,
@@ -215,7 +215,7 @@ def test_lifecycle_receipt_contains_verifiable_canonical_sha256():
 
 def test_reopen_reason_changes_lifecycle_receipt_hash():
     first = reopen_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.FROZEN,
         checkpoint_digest="sha256:abc",
         reopen_reason="verified defect A",
@@ -223,7 +223,7 @@ def test_reopen_reason_changes_lifecycle_receipt_hash():
         policy_version="2.0",
     )
     second = reopen_project(
-        project_id="bodulskihal",
+        project_id="b-1-2",
         current_state=ProjectState.FROZEN,
         checkpoint_digest="sha256:abc",
         reopen_reason="verified defect B",

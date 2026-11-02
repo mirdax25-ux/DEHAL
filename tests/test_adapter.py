@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from bodulskihal_core.adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
+from b_1_2_core.adapter import SCHEMA_VERSION, verify_compound_payload, verify_payload
 
 T0 = "2026-10-01T03:50:00+00:00"
 

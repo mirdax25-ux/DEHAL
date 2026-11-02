@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim,
     ClaimType,
     Directness,
@@ -13,7 +13,7 @@ from bodulskihal_core import (
     canonical_receipt_sha256,
     verify_claim,
 )
-from bodulskihal_core.ingestion import TypeAuthority, verify_model_response
+from b_1_2_core.ingestion import TypeAuthority, verify_model_response
 
 
 T0 = datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)

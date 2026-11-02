@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from bodulskihal_core import ALGORITHM_VERSION
-from bodulskihal_core.adapter import SCHEMA_VERSION
+from b_1_2_core import ALGORITHM_VERSION
+from b_1_2_core.adapter import SCHEMA_VERSION
 
 
 def test_v2_version_contract_is_consistent():

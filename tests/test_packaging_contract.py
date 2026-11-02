@@ -6,5 +6,5 @@ def test_package_discovery_excludes_non_package_project_directories():
     config = (root / "pyproject.toml").read_text(encoding="utf-8")
 
     assert '[tool.setuptools.packages.find]' in config
-    assert 'include = ["bodulskihal_core*"]' in config
+    assert 'include = ["b_1_2_core*"]' in config
     assert 'exclude = ["grants*", "tests*", "examples*"]' in config

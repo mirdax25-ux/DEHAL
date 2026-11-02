@@ -1,4 +1,4 @@
-# BodulskiHal — Catalyst 2026 Evidence Sheet
+# B.1.2 — Catalyst 2026 Evidence Sheet
 
 ## Current implementation evidence
 
@@ -11,10 +11,10 @@ Current package version on `main`:
 `1.3.0`
 
 Verified main artifacts:
-- `bodulskihal_core/engine.py`
-- `bodulskihal_core/adapter.py`
-- `bodulskihal_core/research_demo.py`
-- `bodulskihal_core/evaluation.py`
+- `b_1_2_core/engine.py`
+- `b_1_2_core/adapter.py`
+- `b_1_2_core/research_demo.py`
+- `b_1_2_core/evaluation.py`
 - `examples/research_fixture.json`
 - `examples/research_benchmark.json`
 - `examples/research_demo.py`
@@ -48,7 +48,7 @@ The project intentionally records failures before fixes.
 
 ### BH-EVAL-001
 RED:
-`ModuleNotFoundError: No module named 'bodulskihal_core.evaluation'`
+`ModuleNotFoundError: No module named 'b_1_2_core.evaluation'`
 
 Evolution:
 tests specified the evaluation contract before implementation.

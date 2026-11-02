@@ -93,6 +93,54 @@ class SpanProposal:
     quoted_text: str
 
 
+def _validate_envelope(envelope: RawResponseEnvelope) -> None:
+    if not isinstance(envelope, RawResponseEnvelope):
+        raise TypeError("envelope must be RawResponseEnvelope")
+    if not isinstance(envelope.response_id, str) or not envelope.response_id.strip():
+        raise ValueError("response_id must be non-empty")
+    if not isinstance(envelope.text, str) or not envelope.text.strip():
+        raise ValueError("text must be non-empty")
+    if not isinstance(envelope.speaker_role, SpeakerRole):
+        raise TypeError("speaker_role must be SpeakerRole")
+    if not isinstance(envelope.raw_sha256, str) or envelope.raw_sha256 != hashlib.sha256(
+        envelope.text.encode("utf-8")
+    ).hexdigest():
+        raise ValueError("raw_sha256 must match exact response text")
+
+
+def _validate_atom(atom: ClaimAtom) -> None:
+    if not isinstance(atom, ClaimAtom):
+        raise TypeError("atom must be ClaimAtom")
+    if not isinstance(atom.atom_id, str) or not atom.atom_id.strip():
+        raise ValueError("atom_id must be non-empty")
+    if not isinstance(atom.response_id, str) or not atom.response_id.strip():
+        raise ValueError("response_id must be non-empty")
+    if (
+        isinstance(atom.start, bool)
+        or not isinstance(atom.start, int)
+        or isinstance(atom.end, bool)
+        or not isinstance(atom.end, int)
+    ):
+        raise TypeError("span offsets must be integers")
+    if atom.start < 0 or atom.start >= atom.end:
+        raise ValueError("invalid source span")
+    if not isinstance(atom.source_text, str) or not atom.source_text.strip():
+        raise ValueError("source span must contain non-whitespace text")
+    if atom.end - atom.start != len(atom.source_text):
+        raise ValueError("source span length must match source_text")
+    if not isinstance(atom.status, AtomStatus):
+        raise TypeError("atom.status must be AtomStatus")
+    if not isinstance(atom.review_reasons, tuple) or any(
+        not isinstance(reason, str) or not reason.strip()
+        for reason in atom.review_reasons
+    ):
+        raise TypeError("atom.review_reasons must be a tuple of non-empty strings")
+    if atom.review_reasons != _review_reasons(atom.source_text):
+        raise ValueError("atom.review_reasons must match source_text")
+    if (atom.status is AtomStatus.REVIEW_REQUIRED) != bool(atom.review_reasons):
+        raise ValueError("atom status must match review reasons")
+
+
 _COMPOUND_CUES = re.compile(
     r"\b(and|or|nor|but|while|although|however|whereas|because)\b",
     re.IGNORECASE,
@@ -136,6 +184,8 @@ _AMBIGUOUS_REFERENT = re.compile(
     re.IGNORECASE,
 )
 
+_SENTENCE_CLOSERS = "\"'”’»›)]}"
+
 
 def _review_reasons(source_text: str) -> tuple[str, ...]:
     reasons: list[str] = []
@@ -164,9 +214,15 @@ def bind_atom(
     end: int,
     proposed_text: str | None = None,
 ) -> ClaimAtom:
+    _validate_envelope(envelope)
     if not isinstance(atom_id, str) or not atom_id.strip():
         raise ValueError("atom_id must be non-empty")
-    if not isinstance(start, int) or not isinstance(end, int):
+    if (
+        isinstance(start, bool)
+        or not isinstance(start, int)
+        or isinstance(end, bool)
+        or not isinstance(end, int)
+    ):
         raise TypeError("span offsets must be integers")
     if start < 0 or end > len(envelope.text) or start >= end:
         raise ValueError("invalid source span")
@@ -175,8 +231,11 @@ def bind_atom(
     if not source_text.strip():
         raise ValueError("source span must contain non-whitespace text")
 
-    if proposed_text is not None and proposed_text != source_text:
-        raise ValueError("proposed text must exactly match source span")
+    if proposed_text is not None:
+        if not isinstance(proposed_text, str):
+            raise TypeError("proposed text must be string")
+        if proposed_text != source_text:
+            raise ValueError("proposed text must exactly match source span")
 
     reasons = _review_reasons(source_text)
     status = AtomStatus.REVIEW_REQUIRED if reasons else AtomStatus.READY
@@ -243,6 +302,8 @@ def _sentence_spans(text: str) -> tuple[tuple[int, int], ...]:
                     continue
 
                 next_index = i + 1
+                while next_index < length and text[next_index] in _SENTENCE_CLOSERS:
+                    next_index += 1
                 if next_index >= length or text[next_index].isspace():
                     end = next_index
                     break
@@ -263,6 +324,7 @@ def _sentence_spans(text: str) -> tuple[tuple[int, int], ...]:
 def atomize_raw_response(
     envelope: RawResponseEnvelope,
 ) -> tuple[ClaimAtom, ...]:
+    _validate_envelope(envelope)
     if envelope.speaker_role is not SpeakerRole.ASSISTANT:
         raise ValueError(
             "only assistant responses may be atomized as assistant claims"
@@ -284,14 +346,33 @@ def validate_atom_proposals(
     envelope: RawResponseEnvelope,
     proposals: list[SpanProposal] | tuple[SpanProposal, ...],
 ) -> tuple[ClaimAtom, ...]:
+    _validate_envelope(envelope)
     if envelope.speaker_role is not SpeakerRole.ASSISTANT:
         raise ValueError(
             "only assistant responses may be atomized as assistant claims"
         )
 
+    if not isinstance(proposals, (list, tuple)):
+        raise TypeError("proposals must be list or tuple")
     proposal_seq = tuple(proposals)
-    atom_ids = [proposal.atom_id for proposal in proposal_seq]
-    if len(atom_ids) != len(set(atom_ids)):
+    normalized_atom_ids: list[str] = []
+    for proposal in proposal_seq:
+        if not isinstance(proposal, SpanProposal):
+            raise TypeError("proposals must contain SpanProposal values")
+        if not isinstance(proposal.atom_id, str) or not proposal.atom_id.strip():
+            raise ValueError("atom_id must be non-empty")
+        if (
+            isinstance(proposal.start, bool)
+            or not isinstance(proposal.start, int)
+            or isinstance(proposal.end, bool)
+            or not isinstance(proposal.end, int)
+        ):
+            raise TypeError("span offsets must be integers")
+        if not isinstance(proposal.quoted_text, str):
+            raise TypeError("quoted_text must be string")
+        normalized_atom_ids.append(proposal.atom_id.strip())
+
+    if len(normalized_atom_ids) != len(set(normalized_atom_ids)):
         raise ValueError("duplicate atom_id")
 
     ordered = sorted(
@@ -303,11 +384,6 @@ def validate_atom_proposals(
     atoms: list[ClaimAtom] = []
 
     for proposal in ordered:
-        if not isinstance(proposal.atom_id, str) or not proposal.atom_id.strip():
-            raise ValueError("atom_id must be non-empty")
-        if not isinstance(proposal.quoted_text, str):
-            raise TypeError("quoted_text must be string")
-
         if (
             proposal.start < 0
             or proposal.end > len(envelope.text)
@@ -337,6 +413,7 @@ def validate_atom_proposals(
 
 
 def type_clause(atom: ClaimAtom) -> ClauseTypeDecision:
+    _validate_atom(atom)
     reasons = list(atom.review_reasons)
     blocking_reasons = {
         "compound_clause",
@@ -421,6 +498,7 @@ def build_evidence_contract(
     *,
     type_human_approved: bool = False,
 ) -> EvidenceContract:
+    _validate_atom(atom)
     if not isinstance(claim_type, ClaimType):
         raise TypeError("claim_type must be ClaimType")
     if type(type_human_approved) is not bool:

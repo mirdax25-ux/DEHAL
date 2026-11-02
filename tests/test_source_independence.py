@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from bodulskihal_core import (
+from b_1_2_core import (
     AuthorityScope,
     Claim,
     ClaimType,
@@ -66,7 +66,7 @@ def test_distinct_independence_groups_can_satisfy_medium_risk_quorum():
 
 
 def test_json_adapter_preserves_independence_group():
-    from bodulskihal_core import verify_payload
+    from b_1_2_core import verify_payload
 
     payload = {
         "claim": {

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from itertools import product
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim,
     ClaimType,
     Directness,
@@ -10,7 +10,7 @@ from bodulskihal_core import (
     RiskLevel,
     verify_claim,
 )
-from bodulskihal_core.adapter import verify_payload
+from b_1_2_core.adapter import verify_payload
 
 T0 = datetime(2026, 10, 1, 3, 50, tzinfo=timezone.utc)
 POLICY = Policy(version="1.0", max_age_seconds=300)

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from itertools import product
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim,
     ClaimType,
     Classification,

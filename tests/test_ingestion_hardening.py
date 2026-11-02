@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim,
     ClaimType,
     Policy,
@@ -10,7 +10,7 @@ from bodulskihal_core import (
     Verdict,
     verify_claim,
 )
-from bodulskihal_core.ingestion import (
+from b_1_2_core.ingestion import (
     TypeAuthority,
     collect_normalize_evidence,
     type_clause,
@@ -109,4 +109,48 @@ def test_ingestion_rejects_invalid_independence_group(invalid_group):
         collect_normalize_evidence(
             {"atom-0001": [record("source-a", independence_group=invalid_group)]},
             known_atom_ids={"atom-0001"},
+        )
+
+
+@pytest.mark.parametrize(
+    ("records_by_atom", "known_atom_ids", "message"),
+    [
+        ({1: []}, {"atom-0001"}, "records_by_atom keys must be non-empty strings"),
+        ({}, {1}, "known_atom_ids must contain non-empty strings"),
+        (
+            {"atom-0001": [{1: "unsupported"}]},
+            {"atom-0001"},
+            "keys must be strings",
+        ),
+    ],
+)
+def test_evidence_collection_rejects_non_string_identifiers_and_keys(
+    records_by_atom, known_atom_ids, message
+):
+    with pytest.raises(TypeError, match=message):
+        collect_normalize_evidence(
+            records_by_atom,
+            known_atom_ids=known_atom_ids,
+        )
+
+
+@pytest.mark.parametrize(
+    ("evidence_by_atom", "human_approvals", "message"),
+    [
+        ([], None, "evidence_by_atom must be object"),
+        ({}, [], "human_approvals must be object"),
+        ({}, {1: True}, "human_approvals keys must be non-empty strings"),
+    ],
+)
+def test_model_response_verification_rejects_invalid_mapping_inputs(
+    evidence_by_atom, human_approvals, message
+):
+    with pytest.raises(TypeError, match=message):
+        verify_model_response(
+            "A claim.",
+            evidence_by_atom=evidence_by_atom,
+            authority=TypeAuthority.EXECUTOR,
+            policy=POLICY,
+            evaluation_time=T0,
+            human_approvals=human_approvals,
         )

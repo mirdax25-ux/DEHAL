@@ -3,7 +3,7 @@ from itertools import permutations
 
 import pytest
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim, ClaimType, Directness, Evidence, Policy, RiskLevel, Verdict, verify_claim,
 )
 

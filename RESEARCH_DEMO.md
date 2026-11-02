@@ -17,7 +17,7 @@ Supplied evidence by claim
   ↓
 JSON adapter
   ↓
-BodulskiHal core
+B.1.2 core
   ↓
 Per-claim evidence receipt
   ↓

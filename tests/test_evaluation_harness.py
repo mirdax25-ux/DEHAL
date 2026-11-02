@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from bodulskihal_core.evaluation import evaluate_benchmark
+from b_1_2_core.evaluation import evaluate_benchmark
 
 
 ROOT = Path(__file__).parents[1]

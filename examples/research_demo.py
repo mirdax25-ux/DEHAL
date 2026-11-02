@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from pprint import pprint
 
-from bodulskihal_core import run_research_demo
+from b_1_2_core import run_research_demo
 
 
 fixture_path = Path(__file__).with_name("research_fixture.json")

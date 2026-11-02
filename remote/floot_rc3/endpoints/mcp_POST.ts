@@ -1,4 +1,4 @@
-import { SERVER_VERSION, guardClaim, health, verifyClaims, verifyManifest } from "../helpers/BodulHalCore";
+import { SERVER_VERSION, guardClaim, health, verifyClaims, verifyManifest } from "../helpers/B.1.2Core";
 
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: any };
 const MAX_HTTP_BODY_BYTES = 256 * 1024;
@@ -32,7 +32,7 @@ const toolDescriptors = [
   },
   {
     name: "guard_claim",
-    description: "Run the BodulHal AI Guard Loop: mandatory self-check first, then bounded evidence verification and final-state enforcement. High-risk remote claims always fail closed to ESCALATE because human approval is not authenticated on this transport.",
+    description: "Run the B.1.2 AI Guard Loop: mandatory self-check first, then bounded evidence verification and final-state enforcement. High-risk remote claims always fail closed to ESCALATE because human approval is not authenticated on this transport.",
     inputSchema: {
       type: "object",
       properties: {
@@ -113,7 +113,7 @@ function dispatch(message: Rpc): any {
     return success(id, {
       protocolVersion: requested === SUPPORTED_PROTOCOL_VERSION ? requested : SUPPORTED_PROTOCOL_VERSION,
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "BodulHal", version: SERVER_VERSION },
+      serverInfo: { name: "B.1.2", version: SERVER_VERSION },
     });
   }
   if (message.method === "ping") return success(id, {});

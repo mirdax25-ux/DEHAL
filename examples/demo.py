@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pprint import pprint
 
-from bodulskihal_core import Claim, ClaimType, Directness, Evidence, Policy, verify_claim
+from b_1_2_core import Claim, ClaimType, Directness, Evidence, Policy, verify_claim
 
 now = datetime.now(timezone.utc)
 result = verify_claim(

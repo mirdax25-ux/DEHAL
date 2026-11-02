@@ -1,4 +1,4 @@
-# BodulskiHal
+# B.1.2
 
 Deterministički evidence-first verifier za AI/agent tvrdnje.
 
@@ -8,7 +8,7 @@ Deterministički evidence-first verifier za AI/agent tvrdnje.
 - **JSON adapter:** schema 3
 - **Paket:** 2.1.2
 - **Guard Loop:** 2.0.0 kompatibilna jezgra, proširena strukturiranim unknown zapisima
-- **Integracijska grana:** `integration/bodulskihal-benchmark-20261004`
+- **Grana:** `main`
 - **Provjera:** testovi i CI moraju odgovarati točnom commitu; povijesni broj testova nije status trenutačne verzije.
 
 Ovo nije još release tvrdnja. GitHub CI, neovisni pregled, post-action provjera i eventualni live rollout ostaju zasebni gateovi.
@@ -17,9 +17,11 @@ Ovo nije još release tvrdnja. GitHub CI, neovisni pregled, post-action provjera
 
 **DETERMINISTIČKI ULAZ → NEDETERMINISTIČKA PRIPREMA → DETERMINISTIČKA PROVJERA → RECEIPT**
 
-Nedeterministička priprema može koristiti BodulLogic, PRECICU, modele, memoriju i alate. Ona stvara kandidatni strukturirani ugovor, ne konačnu istinu. BodulskiHal daje završnu klasifikaciju samo iz strukturiranih ulaza i dokaznih pravila.
+Nedeterministička priprema može koristiti BodulLogic, PRECICU, modele, memoriju i alate. Ona stvara kandidatni strukturirani ugovor, ne konačnu istinu. B.1.2 daje završnu klasifikaciju samo iz strukturiranih ulaza i dokaznih pravila.
 
-Detaljna specifikacija: `docs/BODULSKIHAL_2_1_ALGORITHM.md`.
+Detaljna specifikacija: `docs/B.1.2_ALGORITHM.md`.
+
+Distribucijski naziv projekta i Python modul su `B.1.2` (`b_1_2_core`).
 
 ## Klasifikacije
 
@@ -91,9 +93,9 @@ To je deterministic output gate. Semantičko određivanje referenta/cilja ostaje
 
 Svaki receipt uključuje runtime provenance:
 
-- `BODULSKIHAL_SOURCE_COMMIT`
-- `BODULSKIHAL_SOURCE_REF`
-- `BODULSKIHAL_BUILD_ID`
+- `B_1_2_SOURCE_COMMIT`
+- `B_1_2_SOURCE_REF`
+- `B_1_2_BUILD_ID`
 
 Ako policy postavi `require_runtime_provenance=true`, neidentificirani build se blokira.
 
@@ -101,7 +103,9 @@ GitHub CI automatski postavlja ova polja iz GitHub run konteksta.
 
 ## Floot rc.3 audit snapshot
 
-`remote/floot_rc3/` sadrži kopiju izvornog sourcea trenutačnog Floot rc.3 servisa i SHA-256 manifest.
+`remote/floot_rc3/` sadrži preimenovanu arhivsku kopiju izvornog sourcea Floot
+rc.3 servisa i ažurirani SHA-256 manifest. Porijeklo i ograničenja kopije
+dokumentirani su u `remote/floot_rc3/REMOTE_PROVENANCE.md`.
 
 Taj snapshot potvrđuje koji je source opažen u Floot projektu/versionu, ali ne izmišlja retroaktivnu Git commit vezu koja tada nije postojala.
 

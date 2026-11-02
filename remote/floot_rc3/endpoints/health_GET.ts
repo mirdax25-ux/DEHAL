@@ -1,4 +1,4 @@
-import { health } from "../helpers/BodulHalCore";
+import { health } from "../helpers/B.1.2Core";
 export async function handle(_request: Request) {
   return new Response(JSON.stringify(health()), {
     status: 200,

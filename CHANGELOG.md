@@ -3,7 +3,7 @@
 ## v2.1.2 — Integrated boundary and quorum hardening
 
 Continues the merged MAIN + v2 CORE + RAW PIPELINE + INGESTION + GUARD LOOP
-integration on `integration/bodulskihal-benchmark-20261004`. JSON schema stays 3;
+integration on `integration/b-1-2-benchmark-20261004`. JSON schema stays 3;
 the live Floot/native transport is outside this repository change.
 
 ### Failure → Evolution
@@ -117,7 +117,7 @@ this entry alone is not proof of a passed run or live deployment.
 - CI evaluation-harness smoke.
 
 ### Verification
-- TDD RED: GitHub CI failed with `ModuleNotFoundError: bodulskihal_core.evaluation`.
+- TDD RED: GitHub CI failed with `ModuleNotFoundError: b_1_2_core.evaluation`.
 - First GREEN candidate exposed a grant-facing wording regression: test correctly rejected the literal phrase prohibited from the summary; CI showed 1 failed / 52 passed.
 - Wording guardrail fixed the output to state only that no timed human-effort result has been measured.
 - GREEN suite: 53/53 tests.
@@ -141,7 +141,7 @@ this entry alone is not proof of a passed run or live deployment.
 ### Failure → Evolution
 
 #### BH-EVAL-001 — Evaluation layer missing
-- FAILURE MODE: specification tests could not import `bodulskihal_core.evaluation`.
+- FAILURE MODE: specification tests could not import `b_1_2_core.evaluation`.
 - ROOT CAUSE: TDD specification preceded implementation.
 - GUARDRAIL: implement only after RED evidence.
 - REGRESSION TEST: `tests/test_evaluation_harness.py`.

@@ -1,4 +1,4 @@
-# BodulskiHal JSON Contract — schema v3
+# B.1.2 JSON Contract — schema v3
 
 Schema v3 keeps the deterministic JSON adapter boundary and adds epistemic metadata needed by the real conversation benchmark.
 
@@ -61,6 +61,10 @@ independent votes. Different group labels on the same provenance reference still
 count as one group. No URL canonicalization or external source authentication is
 implied by this deterministic comparison.
 
+When `reject_future_evidence` is false, future-dated evidence is not rejected by
+the freshness gate; otherwise, evidence newer than the evaluation time is
+ineligible.
+
 The ingestion evidence boundary accepts the same optional `independence_group`
 field. The Python ingestion API requires a real `TypeAuthority` enum member;
 strings and other runtime values are rejected before claim typing. Lifecycle
@@ -77,6 +81,10 @@ Schema v3 supports:
 - CONFLICT
 
 Pure eligible counterevidence is REFUTED. Mixed supporting and contradicting evidence is CONFLICT.
+
+Receipts distinguish `eligible_source_count` (unique normalized source IDs) from
+`eligible_evidence_count` (eligible evidence records); neither count implies
+independence, which is reported separately.
 
 ## Evidence origin
 
@@ -121,9 +129,9 @@ Every receipt contains runtime provenance fields. A policy may set:
 `require_runtime_provenance = true`
 
 Then the verifier requires:
-- `BODULSKIHAL_SOURCE_COMMIT`
-- `BODULSKIHAL_SOURCE_REF`
-- `BODULSKIHAL_BUILD_ID`
+- `B_1_2_SOURCE_COMMIT`
+- `B_1_2_SOURCE_REF`
+- `B_1_2_BUILD_ID`
 
 to identify a verified build.
 

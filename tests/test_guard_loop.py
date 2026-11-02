@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim,
     ClaimType,
     Classification,
@@ -12,7 +12,7 @@ from bodulskihal_core import (
     RiskLevel,
     Verdict,
 )
-from bodulskihal_core.guard_loop import (
+from b_1_2_core.guard_loop import (
     GuardStage,
     Realism,
     SelfCheck,

@@ -1,6 +1,6 @@
 import pytest
 
-from bodulskihal_core.adapter import verify_payload
+from b_1_2_core.adapter import verify_payload
 
 
 T0 = "2026-10-01T08:00:00+00:00"

@@ -1,4 +1,4 @@
-name: BodulskiHal Core CI
+name: B.1.2 Core CI
 
 on:
   push:
@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 env:
-  BODULSKIHAL_SOURCE_COMMIT: ${{ github.sha }}
-  BODULSKIHAL_SOURCE_REF: ${{ github.ref }}
-  BODULSKIHAL_BUILD_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}
+  B_1_2_SOURCE_COMMIT: ${{ github.sha }}
+  B_1_2_SOURCE_REF: ${{ github.ref }}
+  B_1_2_BUILD_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   verify:
@@ -37,7 +37,7 @@ jobs:
           python -m pip install -e . pytest
 
       - name: Compile
-        run: python -m compileall -q bodulskihal_core
+        run: python -m compileall -q b_1_2_core
 
       - name: Test
         run: python -m pytest
@@ -45,7 +45,7 @@ jobs:
       - name: Runtime provenance gate
         run: |
           python - <<'PY'
-          from bodulskihal_core import current_runtime_provenance
+          from b_1_2_core import current_runtime_provenance
           p = current_runtime_provenance()
           print(p)
           assert p.verified, p

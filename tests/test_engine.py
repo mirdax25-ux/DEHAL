@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from bodulskihal_core import (
+from b_1_2_core import (
     Claim,
     ClaimType,
     Classification,
@@ -234,6 +234,58 @@ def test_future_dated_evidence_is_ineligible_by_default():
     assert result.verdict is Verdict.BLOCK
 
 
+def test_future_dated_evidence_is_eligible_when_policy_allows_it():
+    future = Evidence(
+        source_id="future",
+        supports=True,
+        observed_at=T0 + timedelta(seconds=1),
+        directness=Directness.DIRECT,
+    )
+    result = verify_claim(
+        Claim("c1", "File exists", ClaimType.OBSERVATION),
+        [future],
+        policy=Policy(
+            version="future-allowed",
+            max_age_seconds=300,
+            reject_future_evidence=False,
+        ),
+        evaluation_time=T0,
+    )
+
+    assert result.classification is Classification.FACT
+    assert result.verdict is Verdict.APPROVE
+
+
+@pytest.mark.parametrize(
+    ("policy_kwargs", "message"),
+    [
+        ({"reject_future_evidence": "false"}, "reject_future_evidence must be bool"),
+        (
+            {"require_independent_action_evidence": 0},
+            "require_independent_action_evidence must be bool",
+        ),
+        ({"max_age_seconds": True}, "max_age_seconds must be int"),
+        (
+            {"medium_risk_min_independent_sources": False},
+            "medium_risk_min_independent_sources must be int",
+        ),
+    ],
+)
+def test_policy_rejects_invalid_runtime_types(policy_kwargs, message):
+    policy_arguments = {
+        "version": "invalid-policy",
+        "max_age_seconds": 300,
+        **policy_kwargs,
+    }
+    with pytest.raises(TypeError, match=message):
+        verify_claim(
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [],
+            policy=Policy(**policy_arguments),
+            evaluation_time=T0,
+        )
+
+
 def test_duplicate_source_ids_are_rejected_to_preserve_provenance_identity():
     with pytest.raises(ValueError, match="duplicate source_id"):
         verify_claim(
@@ -292,6 +344,34 @@ def test_receipt_has_explicit_gate_summary():
     assert gates["contradiction_count"] == 0
     assert gates["post_action_verified"] is True
     assert gates["human_gate"] == "approved"
+
+
+def test_receipt_distinguishes_unique_sources_from_evidence_records():
+    result = verify_claim(
+        Claim("c1", "Two observations from one provider", ClaimType.OBSERVATION),
+        [
+            Evidence(
+                source_id="provider",
+                evidence_id="record-1",
+                supports=True,
+                observed_at=T0,
+                directness=Directness.DIRECT,
+            ),
+            Evidence(
+                source_id=" provider ",
+                evidence_id="record-2",
+                supports=True,
+                observed_at=T0,
+                directness=Directness.DIRECT,
+            ),
+        ],
+        policy=POLICY,
+        evaluation_time=T0,
+    )
+
+    gates = result.receipt["gates"]
+    assert gates["eligible_source_count"] == 1
+    assert gates["eligible_evidence_count"] == 2
 
 
 def test_receipt_lists_contradicting_sources_deterministically():
@@ -354,9 +434,84 @@ def test_compound_rejects_duplicate_claim_ids():
         )
 
 
+@pytest.mark.parametrize(
+    ("evidence_by_claim", "human_approvals", "message"),
+    [
+        ({"other": []}, None, "evidence_by_claim contains unknown claim id"),
+        ({}, {"other": True}, "human_approvals contains unknown claim id"),
+    ],
+)
+def test_compound_rejects_unknown_claim_references(
+    evidence_by_claim, human_approvals, message
+):
+    with pytest.raises(ValueError, match=message):
+        verify_compound(
+            [Claim("c1", "File exists", ClaimType.OBSERVATION)],
+            evidence_by_claim,
+            policy=POLICY,
+            evaluation_time=T0,
+            human_approvals=human_approvals,
+        )
+
+
+@pytest.mark.parametrize(
+    ("claim", "evidence", "message"),
+    [
+        (
+            Claim("c1", "File exists", "observation"),
+            [],
+            "claim.claim_type must be ClaimType",
+        ),
+        (
+            Claim("c1", "File exists", ClaimType.OBSERVATION, consequential=1),
+            [],
+            "claim.consequential must be bool",
+        ),
+        (
+            Claim("c1", "File exists", ClaimType.OBSERVATION),
+            [
+                Evidence(
+                    "source",
+                    True,
+                    T0,
+                    "direct",
+                )
+            ],
+            "evidence.directness must be Directness",
+        ),
+    ],
+)
+def test_core_rejects_invalid_runtime_model_types(claim, evidence, message):
+    with pytest.raises(TypeError, match=message):
+        verify_claim(
+            claim,
+            evidence,
+            policy=POLICY,
+            evaluation_time=T0,
+        )
+
+
 def test_empty_compound_does_not_vacuously_approve():
     with pytest.raises(ValueError, match="at least one claim"):
         verify_compound([], {}, policy=POLICY, evaluation_time=T0)
+
+
+def test_compound_materializes_claim_generators_before_validation():
+    claims = (claim for claim in [Claim("c1", "File exists", ClaimType.OBSERVATION)])
+    result = verify_compound(
+        claims,
+        {},
+        policy=POLICY,
+        evaluation_time=T0,
+    )
+
+    assert len(result.results) == 1
+    assert result.verdict is Verdict.BLOCK
+
+
+def test_empty_compound_generator_does_not_vacuously_approve():
+    with pytest.raises(ValueError, match="at least one claim"):
+        verify_compound(iter(()), {}, policy=POLICY, evaluation_time=T0)
 
 
 def test_high_risk_rejects_non_boolean_human_approval():

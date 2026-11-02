@@ -1,5 +1,5 @@
-from bodulskihal_core import ClaimType
-from bodulskihal_core.raw_pipeline import (
+from b_1_2_core import ClaimType
+from b_1_2_core.raw_pipeline import (
     ClauseTypeStatus,
     RawResponseEnvelope,
     SpeakerRole,

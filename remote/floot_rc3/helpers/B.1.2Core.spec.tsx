@@ -1,6 +1,6 @@
-import { CORE_VERSION, MAX_CANONICAL_TOOL_INPUT_BYTES, SERVER_VERSION, canonicalJsonByteLength, guardClaim, health, jsonDepth, verifyClaims, verifyManifest } from "./BodulHalCore";
+import { CORE_VERSION, MAX_CANONICAL_TOOL_INPUT_BYTES, SERVER_VERSION, canonicalJsonByteLength, guardClaim, health, jsonDepth, verifyClaims, verifyManifest } from "./B.1.2Core";
 
-describe("BodulHal 1.2.0-rc.3 remote contract", () => {
+describe("B.1.2 1.2.0-rc.3 remote contract", () => {
   const now = new Date("2026-09-27T16:30:00Z");
   const ts = "2026-09-27T16:29:55Z";
   const doc = { status:"ok", version:SERVER_VERSION, core_version:CORE_VERSION, max_claims:20 };

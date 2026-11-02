@@ -38,7 +38,7 @@ https://www.digital-science.com/press-releases/research-impact-data-into-ai-work
 Current official positioning:
 - Dimensions MCP gives enterprise AI agents access to interconnected research records.
 - Altmetric MCP connects AI agents to research-attention data.
-- This creates a concrete integration hypothesis for BodulskiHal: research data enters through MCP; a separate verification layer evaluates downstream claims, contradictions, action-state evidence and human escalation.
+- This creates a concrete integration hypothesis for B.1.2: research data enters through MCP; a separate verification layer evaluates downstream claims, contradictions, action-state evidence and human escalation.
 
 Important:
 No Digital Science integration is currently implemented or agreed.
@@ -53,7 +53,7 @@ Current positioning:
 - Smart Citations expose supporting and contrasting citation evidence
 - source-linked answers and research verification
 
-BodulskiHal distinction being tested:
+B.1.2 distinction being tested:
 not a literature database; an independent verdict/policy layer after an agent or workflow.
 
 ### Elicit
@@ -66,7 +66,7 @@ Current positioning:
 - systematic-review workflows
 - source-linked/auditable research outputs
 
-BodulskiHal distinction being tested:
+B.1.2 distinction being tested:
 not a replacement for evidence synthesis; a reusable gate for FACT/UNKNOWN/CONFLICT, final-state verification and human escalation.
 
 ### ResearchRabbit
@@ -75,7 +75,7 @@ https://www.researchrabbit.ai/
 Current positioning:
 literature discovery and navigation of relationships between papers.
 
-BodulskiHal distinction:
+B.1.2 distinction:
 verification/governance rather than discovery.
 
 ## Novelty boundary

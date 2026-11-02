@@ -30,6 +30,11 @@ def _validate_bool(value: bool, name: str) -> None:
         raise TypeError(f"{name} must be bool")
 
 
+def _validate_state(value: ProjectState) -> None:
+    if not isinstance(value, ProjectState):
+        raise TypeError("current_state must be ProjectState")
+
+
 def _receipt(
     *,
     project_id: str,
@@ -73,8 +78,14 @@ def freeze_project(
     project_id = _non_empty(project_id, "project_id")
     checkpoint_digest = _non_empty(checkpoint_digest, "checkpoint_digest")
     policy_version = _non_empty(policy_version, "policy_version")
+    _validate_state(current_state)
     _validate_bool(checkpoint_verified, "checkpoint_verified")
     _validate_bool(human_approved, "human_approved")
+    if current_checkpoint_digest is not None:
+        current_checkpoint_digest = _non_empty(
+            current_checkpoint_digest,
+            "current_checkpoint_digest",
+        )
 
     if current_state is ProjectState.FROZEN:
         if current_checkpoint_digest == checkpoint_digest:
@@ -179,6 +190,7 @@ def authorize_mutation(
 ) -> LifecycleResult:
     project_id = _non_empty(project_id, "project_id")
     policy_version = _non_empty(policy_version, "policy_version")
+    _validate_state(current_state)
 
     if current_state is ProjectState.FROZEN:
         reason = "project_frozen_controlled_reopen_required"
@@ -218,6 +230,7 @@ def reopen_project(
     checkpoint_digest = _non_empty(checkpoint_digest, "checkpoint_digest")
     reopen_reason = _non_empty(reopen_reason, "reopen_reason")
     policy_version = _non_empty(policy_version, "policy_version")
+    _validate_state(current_state)
     _validate_bool(human_approved, "human_approved")
 
     if current_state is not ProjectState.FROZEN:

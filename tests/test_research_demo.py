@@ -1,4 +1,4 @@
-from bodulskihal_core.research_demo import run_research_demo
+from b_1_2_core.research_demo import run_research_demo
 
 
 T0 = "2026-10-01T04:10:00+00:00"

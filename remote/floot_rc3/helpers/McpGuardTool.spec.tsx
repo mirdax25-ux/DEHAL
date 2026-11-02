@@ -9,7 +9,7 @@ async function rpc(body:any) {
   return { status:response.status, json:await response.json() };
 }
 
-describe("BodulHal Guard Loop MCP tool", () => {
+describe("B.1.2 Guard Loop MCP tool", () => {
   it("lists guard_claim without removing existing tools", async () => {
     const r = await rpc({jsonrpc:"2.0",id:1,method:"tools/list",params:{}});
     const names = r.json.result.tools.map((tool:any) => tool.name);

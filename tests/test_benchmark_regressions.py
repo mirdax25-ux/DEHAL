@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from bodulskihal_core import (
+from b_1_2_core import (
     AnswerabilityStatus,
     AuthorityScope,
     Claim,
@@ -17,12 +17,12 @@ from bodulskihal_core import (
     Verdict,
     verify_claim,
 )
-from bodulskihal_core.conversation_gate import (
+from b_1_2_core.conversation_gate import (
     ConstraintRecord,
     ConversationContract,
     evaluate_conversation_contract,
 )
-from bodulskihal_core.guard_loop import (
+from b_1_2_core.guard_loop import (
     Realism,
     SelfCheck,
     UnknownRecord,
@@ -254,7 +254,7 @@ def test_conversation_contract_rejects_referent_drift():
     result = evaluate_conversation_contract(
         ConversationContract(
             goal_id="find-grants",
-            referent_id="three-bodulskihal-grants",
+            referent_id="three-b-1-2-grants",
             candidate_goal_id="find-grants",
             candidate_referent_id="PRECICA",
             constraints=(),
@@ -310,9 +310,9 @@ def test_conversation_contract_approves_matching_candidate():
 
 def test_required_runtime_provenance_blocks_unidentified_build(monkeypatch):
     for name in (
-        "BODULSKIHAL_SOURCE_COMMIT",
-        "BODULSKIHAL_SOURCE_REF",
-        "BODULSKIHAL_BUILD_ID",
+        "B_1_2_SOURCE_COMMIT",
+        "B_1_2_SOURCE_REF",
+        "B_1_2_BUILD_ID",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -334,9 +334,9 @@ def test_required_runtime_provenance_blocks_unidentified_build(monkeypatch):
 
 def test_runtime_receipt_binds_commit_ref_and_build_id(monkeypatch):
     commit = "a" * 40
-    monkeypatch.setenv("BODULSKIHAL_SOURCE_COMMIT", commit)
-    monkeypatch.setenv("BODULSKIHAL_SOURCE_REF", "integration/bodulskihal-next-20261003")
-    monkeypatch.setenv("BODULSKIHAL_BUILD_ID", "ci-123")
+    monkeypatch.setenv("B_1_2_SOURCE_COMMIT", commit)
+    monkeypatch.setenv("B_1_2_SOURCE_REF", "integration/b-1-2-next-20261003")
+    monkeypatch.setenv("B_1_2_BUILD_ID", "ci-123")
 
     result = verify_claim(
         Claim("c1", "Verified value", ClaimType.OBSERVATION),
@@ -352,7 +352,7 @@ def test_runtime_receipt_binds_commit_ref_and_build_id(monkeypatch):
     provenance = result.receipt["runtime_provenance"]
     assert provenance == {
         "source_commit": commit,
-        "source_ref": "integration/bodulskihal-next-20261003",
+        "source_ref": "integration/b-1-2-next-20261003",
         "build_id": "ci-123",
         "verified": True,
     }

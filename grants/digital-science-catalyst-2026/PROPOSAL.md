@@ -1,14 +1,14 @@
-# Digital Science Catalyst Grant 2026 — BodulskiHal
+# Digital Science Catalyst Grant 2026 — B.1.2
 
 ## 1. THE PROBLEM
 
 Research agents are increasingly able to search, extract, synthesize and act across several steps, but their outputs are still hard to trust at the point where a person or institution must make a decision. A fluent agent can blur together direct evidence, inference, estimates, missing evidence and conflicting evidence. The practical cost is not only hallucinated text: it is duplicated checking, unclear accountability, and the risk that an agent reports an action or research state as complete when the final state was never independently verified.
 
-BodulskiHal is aimed at researchers, research teams, publishers and institutions using multi-step AI workflows. Today, users typically re-open sources, inspect citations manually, re-run searches, or rely on the same agent that produced the answer to explain why it should be trusted. The problem appears every time an AI-generated research output must cross from “helpful draft” into a decision, publication, evidence synthesis, funding workflow or other accountable process.
+B.1.2 is aimed at researchers, research teams, publishers and institutions using multi-step AI workflows. Today, users typically re-open sources, inspect citations manually, re-run searches, or rely on the same agent that produced the answer to explain why it should be trusted. The problem appears every time an AI-generated research output must cross from “helpful draft” into a decision, publication, evidence synthesis, funding workflow or other accountable process.
 
 ## 2. YOUR WORKFLOW
 
-BodulskiHal is an independent verification layer that sits between an agent’s work and the final accepted output.
+B.1.2 is an independent verification layer that sits between an agent’s work and the final accepted output.
 
 The current reference flow is:
 
@@ -30,7 +30,7 @@ Missing eligible evidence becomes UNKNOWN rather than a guessed answer. Eligible
 
 The current deterministic research fixture deliberately includes tasks the system should refuse, block or escalate. In the reference benchmark, an unsupported claim is BLOCKED, contradictory evidence produces CONFLICT/BLOCK, an unverified action completion is BLOCKED, and a high-risk claim without human approval is ESCALATED.
 
-Accountability remains with the human owner or institution. BodulskiHal records why a claim passed or did not pass; it does not remove the need for domain judgment or claim that supplied evidence is automatically authentic.
+Accountability remains with the human owner or institution. B.1.2 records why a claim passed or did not pass; it does not remove the need for domain judgment or claim that supplied evidence is automatically authentic.
 
 ## 4. TEAM
 
@@ -42,7 +42,7 @@ No external advisors are being claimed at this stage.
 
 ## 5. WHERE YOU ARE TODAY
 
-BodulskiHal is a working reference prototype, not a production deployment.
+B.1.2 is a working reference prototype, not a production deployment.
 
 The current GitHub implementation includes a deterministic verification core, a strict JSON adapter, a reproducible research-agent evidence demo and a v1.3 evaluation harness. The current test suite has 53 passing tests, with GitHub CI passing on Python 3.10, 3.11 and 3.13. The final CI workflow installs the package, compiles it, runs the full suite, runs the research demo and runs the evaluation harness.
 
@@ -62,7 +62,7 @@ These are bounded results on a tiny deterministic fixture, not general accuracy 
 
 Several strong products address adjacent parts of the problem. Scite grounds research answers in scientific literature and exposes supporting or contrasting citation evidence. Elicit provides agentic research, evidence synthesis, systematic-review workflows and auditable source-linked outputs. ResearchRabbit focuses on literature discovery and navigating relationships between papers.
 
-BodulskiHal is not intended to replace these systems. Its focus is narrower: an independent policy and evidence gate that can sit after an agent or research workflow and decide whether a bounded claim may be accepted, blocked or escalated. The differentiation we are testing is the separation of executor from verifier, explicit UNKNOWN/CONFLICT states, post-action verification, human gates, deterministic receipts and regression-driven guardrails.
+B.1.2 is not intended to replace these systems. Its focus is narrower: an independent policy and evidence gate that can sit after an agent or research workflow and decide whether a bounded claim may be accepted, blocked or escalated. The differentiation we are testing is the separation of executor from verifier, explicit UNKNOWN/CONFLICT states, post-action verification, human gates, deterministic receipts and regression-driven guardrails.
 
 A broader prior-art and competitor review is still required before making any novelty claim.
 
@@ -74,9 +74,9 @@ A commercial model could combine an open verification core with paid hosted infr
 
 ## 8. FIT WITH DIGITAL SCIENCE
 
-BodulskiHal sits primarily in evidence synthesis, research integrity and institutional decision workflows. The intended users are researchers, publishers, funders and research organizations deploying agentic AI where provenance and accountability matter.
+B.1.2 sits primarily in evidence synthesis, research integrity and institutional decision workflows. The intended users are researchers, publishers, funders and research organizations deploying agentic AI where provenance and accountability matter.
 
-The 2026 Catalyst theme is unusually well matched to the problem we are solving: multi-step AI that acts on research, with audit trails, governance and provenance. Digital Science’s recent Dimensions and Altmetric MCP work also makes the fit concrete: trusted research data can enter an agentic workflow through MCP, while BodulskiHal can test whether downstream claims and actions are sufficiently evidenced to approve, block or escalate. We would value Digital Science’s research-software experience, access to real workflow feedback, and guidance on testing this verification layer inside systems researchers already use rather than building another isolated AI interface.
+The 2026 Catalyst theme is unusually well matched to the problem we are solving: multi-step AI that acts on research, with audit trails, governance and provenance. Digital Science’s recent Dimensions and Altmetric MCP work also makes the fit concrete: trusted research data can enter an agentic workflow through MCP, while B.1.2 can test whether downstream claims and actions are sufficiently evidenced to approve, block or escalate. We would value Digital Science’s research-software experience, access to real workflow feedback, and guidance on testing this verification layer inside systems researchers already use rather than building another isolated AI interface.
 
 ## 9. BUDGET
 

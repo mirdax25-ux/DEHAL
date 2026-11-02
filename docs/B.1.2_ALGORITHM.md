@@ -1,10 +1,10 @@
-# BodulskiHal 2.1 — algoritam i granice odgovornosti
+# B.1.2 2.1 — algoritam i granice odgovornosti
 
 ## Temeljno pravilo
 
 **DETERMINISTIČKI ULAZ → NEDETERMINISTIČKA PRIPREMA → DETERMINISTIČKA PROVJERA → RECEIPT**
 
-BodulskiHal ne smije pretvoriti nedeterminističku pripremu u autoritet istine. Semantička priprema, retrieval, atomizacija ili kandidiranje može koristiti model/Logic/PRECICA, ali finalni verifier radi samo nad strukturiranim ugovorom i dokazima.
+B.1.2 ne smije pretvoriti nedeterminističku pripremu u autoritet istine. Semantička priprema, retrieval, atomizacija ili kandidiranje može koristiti model/Logic/PRECICA, ali finalni verifier radi samo nad strukturiranim ugovorom i dokazima.
 
 ## Faza A — deterministički ulaz
 
@@ -161,7 +161,7 @@ Novi release ne smije izgubiti prethodni prolaz bez eksplicitnog objašnjenja.
 - BH-AUTHORITY-001 — korisničko “oko 30” ne smije postati vanjska činjenica bez neovisnog dokaza.
 - BH-AUTHORITY-002 — korisnikova vlastita preference/instruction može biti autoritativna unutar pripadajućeg scopea.
 - BH-UNKNOWN-BLOCK-001 — reviewed critical unresolved unknown mora eskalirati/blokirati.
-- BH-REFERENT-001 — kandidat za tri BodulskiHal prijave ne smije proći s referentom PRECICA.
+- BH-REFERENT-001 — kandidat za tri B.1.2 prijave ne smije proći s referentom PRECICA.
 - BH-CONSTRAINT-001 — aktivni hrvatski/latinica constraint mora biti zadovoljen.
 - BH-PROVENANCE-001 — release policy može zahtijevati dokazivi source/build identitet.
 - BH-SOURCE-INDEPENDENCE-001 — dvije evidence instance istog source_id ne zadovoljavaju quorum.
