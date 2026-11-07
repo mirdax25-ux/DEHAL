@@ -1,6 +1,6 @@
-# BodulskiHal Core
+# DEHAL (formerly BodulskiHal Core)
 
-Python verification engine for structured claims and supplied evidence. It classifies support, contradiction and uncertainty and returns APPROVE, BLOCK or ESCALATE.
+DEHAL — **DE**tecting **HAL**lucinations. Python verification engine for structured claims and supplied evidence. It classifies support, contradiction and uncertainty and returns APPROVE, BLOCK or ESCALATE.
 
 ## Quick start
 
@@ -47,6 +47,8 @@ See [verification record](docs/VERIFICATION.md) for executed checks and [algorit
 Core/package version: 2.1.2. The Python core, historical Floot snapshot and separate live MCP services have independent versions. A health response alone does not establish source parity.
 
 Supplied JSON is evidence content, not proof of the source's authenticity. This engine does not independently certify arbitrary prose, all hallucinations, or an external action. The OAuth transport candidate remains on `feature/bodulhal-oauth-guard-20261012`; it is a service variant, not a separately verified product in this package.
+
+**Naming decision (2026-11-07):** product name is DEHAL. Repository rename `Brutala-Hal-` → `DEHAL` follows via GitHub Settings; GitHub will redirect old URLs automatically.
 
 ## License
 
