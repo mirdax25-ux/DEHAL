@@ -31,8 +31,24 @@ def extract_numbers(text: str) -> list[float]:
     return out
 
 
+def _decimals(n: float) -> int:
+    """Decimal places present in the number as written (342.4 -> 1, 342 -> 0)."""
+    s = repr(float(n))
+    return len(s.split(".")[1]) if "." in s and "e" not in s and "E" not in s else 0
+
+
 def numeric_match(numbers: Iterable[float], price: float, tolerance: float) -> bool:
-    return any(abs(n - price) <= tolerance for n in numbers)
+    """A snapshot number covers the price if it is within tolerance OR if it is
+    the price rounded to the number of decimals the snapshot number carries
+    (e.g. claim 342.37 vs source '342.4'). Rounding to fewer digits than the
+    claim never widens coverage beyond one rounding step of the source number.
+    """
+    for n in numbers:
+        if abs(n - price) <= tolerance:
+            return True
+        if round(price, _decimals(n)) == n:
+            return True
+    return False
 
 
 def price_covered(snapshots: list[EvidenceSnapshot], price: float,
