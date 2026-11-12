@@ -1,55 +1,73 @@
-# DEHAL (formerly BodulskiHal Core)
+# DEHAL
 
-DEHAL — **DE**tecting **HAL**lucinations. Python verification engine for structured claims and supplied evidence. It classifies support, contradiction and uncertainty and returns APPROVE, BLOCK or ESCALATE.
+[![CI](https://github.com/mirdax25-ux/DEHAL/actions/workflows/ci.yml/badge.svg)](https://github.com/mirdax25-ux/DEHAL/actions/workflows/ci.yml)
 
-## Quick start
+DEHAL is a Python verification engine for structured claims and supplied evidence. Its deterministic v2 engine returns `APPROVE`, `BLOCK`, or `ESCALATE`. It evaluates provided evidence snapshots rather than fetching sources, and the evaluation time is an explicit input.
 
-Requires Python 3.10 or newer.
+DEHAL is intended for teams integrating AI or agent workflows that need to check structured claims against evidence before relying on them. The v2 engine applies deterministic checks; an optional observer can only cause an `ESCALATE`. Each verdict includes SHA-256 claim and evidence hashes for provenance. These hashes identify inputs; they do not establish that an external source is authentic.
 
-```bash
-git clone https://github.com/mirdax25-ux/Brutala-Hal-.git
-cd Brutala-Hal-
-python -m pip install -e ".[test]"
-python examples/demo.py
-python examples/research_demo.py
-python examples/evaluation_demo.py
+## Minimal example
+
+This uses the public `dehal.dehal_v2` API and the same executable example in [`examples/minimal_check.py`](examples/minimal_check.py):
+
+```python
+import hashlib
+from datetime import datetime, timezone
+
+from dehal.dehal_v2 import EvidenceSnapshot, verify
+
+claim = {
+    "ticker": "AAPL",
+    "price": 342.37,
+    "currency": "USD",
+    "datetime": "2026-11-06T16:00:00-05:00",
+    "price_type": "close",
+    "exchange": "NASDAQ",
+    "raw_text": "AAPL closed at 342.37.",
+}
+text = "AAPL closed at 342.37 USD."
+snapshot = EvidenceSnapshot(
+    source_id="example",
+    text=text,
+    sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    fetched_at="2026-11-07T10:00:00+00:00",
+)
+
+verdict = verify(
+    claim,
+    [snapshot],
+    datetime(2026, 11, 7, 12, 0, tzinfo=timezone.utc),
+)
+print(verdict.to_json())
 ```
 
-Each demo uses checked-in fixtures. No model account or API key is required for these examples.
+## Quickstart
 
-## Architecture
+1. Clone the repository:
 
-| Path | Responsibility |
-| --- | --- |
-| `bodulskihal_core/engine.py` | Claim types, evidence policy and verdicts |
-| `adapter.py`, `ingestion.py`, `raw_pipeline.py` | Structured-input ingestion |
-| `guard_loop.py`, `conversation_gate.py` | Guard and conversation contracts |
-| `runtime_provenance.py` | Runtime source/ref/build identity |
-| `examples/` | Runnable examples and fixtures |
-| `tests/` | Unit, adversarial and contract regression checks |
-| `remote/floot_rc3/` | Historical remote source snapshot |
+   ```bash
+   git clone https://github.com/mirdax25-ux/DEHAL.git
+   ```
 
-Paths without a directory prefix above are inside `bodulskihal_core/`.
+2. Enter the repository:
 
-## Verification and packaging
+   ```bash
+   cd DEHAL
+   ```
 
-```bash
-python -m pytest
-python -m compileall -q bodulskihal_core
-python -m pip install build
-python -m build
-```
+3. Install the package and run the example:
 
-See [verification record](docs/VERIFICATION.md) for executed checks and [algorithm overview](docs/ALGORITHM_OVERVIEW.md) for the detailed rules.
+   ```bash
+   python -m pip install -e ".[test]"
+   python examples/minimal_check.py
+   ```
 
-## Versions and boundaries
+Python 3.10 or newer is required. Run the test suite with `python -m pytest`.
 
-Core/package version: 2.1.2. The Python core, historical Floot snapshot and separate live MCP services have independent versions. A health response alone does not establish source parity.
+## v2 reference behavior
 
-Supplied JSON is evidence content, not proof of the source's authenticity. This engine does not independently certify arbitrary prose, all hallucinations, or an external action. The OAuth transport candidate remains on `feature/bodulhal-oauth-guard-20261012`; it is a service variant, not a separately verified product in this package.
-
-**Naming decision (2026-11-07):** product name is DEHAL. Repository rename `Brutala-Hal-` → `DEHAL` follows via GitHub Settings; GitHub will redirect old URLs automatically.
+The independent reference implementation in [`v2_reference/dehal_core.py`](v2_reference/dehal_core.py) documents a small claim-and-evidence API. It fails closed for invalid input and missing evidence, blocks contradictions, and escalates flagged or unsupported evidence. Its optional LLM proposal accepts only `ESCALATE`; deterministic grounding can veto that proposal. See [the v2 architecture note](docs/architecture.md) for the evaluation order and provenance fields.
 
 ## License
 
-[Apache License 2.0](LICENSE). Attribution information is in [NOTICE](NOTICE). Dependencies retain their respective licenses.
+DEHAL is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution information.
