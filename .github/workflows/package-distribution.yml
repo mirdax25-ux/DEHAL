@@ -1,0 +1,36 @@
+name: package-distribution
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/package-distribution.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build source archive
+        run: |
+          set -euo pipefail
+          NAME="${GITHUB_REPOSITORY#*/}"
+          DATE=$(date -u +%Y-%m-%d)
+          git archive --format=zip --prefix="${NAME}/" -o "${NAME}-${DATE}-source.zip" HEAD
+          sha256sum "${NAME}-${DATE}-source.zip" | tee "${NAME}-${DATE}-source.zip.sha256"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NAME="${GITHUB_REPOSITORY#*/}"
+          DATE=$(date -u +%Y-%m-%d)
+          TAG="distribution-${DATE}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${NAME}-${DATE}-source.zip" "${NAME}-${DATE}-source.zip.sha256" --clobber
+          else
+            gh release create "$TAG" "${NAME}-${DATE}-source.zip" "${NAME}-${DATE}-source.zip.sha256" --title "Source distribution ${DATE}" --notes "Automated source snapshot archive with SHA-256 checksum. Built by GitHub Actions from repository HEAD."
+          fi
